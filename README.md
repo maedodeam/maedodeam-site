@@ -3,27 +3,74 @@
 Site institucional da **MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA**, publicado pelo
 GitHub Pages em `https://maedodeam.com.br`.
 
-Site 100% estático: HTML e CSS, sem JavaScript, sem fontes externas, sem build.
+Site estático: HTML, CSS e um JavaScript pequeno (opcional — sem ele, tudo funciona, só sem animações).
+Sem framework, sem cookies, sem analytics e sem fontes ou scripts de terceiros. Os HTML publicados são
+**gerados** a partir de `src/` por um script Python sem dependências, e o resultado fica no repositório:
+o GitHub Pages continua servindo a raiz da branch `main`, sem etapa de build.
 
 ```
 maedodeam-site/
-├── index.html     página inicial (apresentação, jogos, contato)
-├── privacy.html   política de privacidade dos produtos
-├── support.html   suporte
-├── 404.html       página de erro do GitHub Pages
-├── style.css      estilo único (claro/escuro automático)
-├── CNAME          domínio próprio: maedodeam.com.br
-├── .nojekyll      diz ao GitHub Pages para publicar os arquivos como estão (sem Jekyll)
-└── README.md
+├── index.html             página inicial em inglês (idioma principal)       ← gerado
+├── pt-br/index.html       página inicial em português do Brasil             ← gerado
+├── support.html           suporte (EN) · pt-br/support.html (PT-BR)         ← gerado
+├── 404.html               página de erro do GitHub Pages (EN + PT)          ← gerado
+├── privacy.html           política de privacidade (texto à mão; cabeçalho e rodapé gerados)
+├── sitemap.xml, robots.txt                                                  ← gerado
+├── assets/
+│   ├── site.css           estilo único (tema escuro, mobile first)
+│   ├── site.js            animações, menu ativo, copiar e-mail
+│   ├── fonts/             Archivo e JetBrains Mono (variáveis, subconjunto latino, licença OFL)
+│   ├── img/               capturas do jogo em AVIF e WebP, 4 larguras, HUD em EN e PT-BR
+│   └── og-en.jpg, og-pt-br.jpg   imagens de compartilhamento (Open Graph)
+├── favicon.svg, favicon.ico, apple-touch-icon.png
+├── src/
+│   ├── build.py           gera as páginas
+│   ├── i18n/en.json       textos em inglês
+│   ├── i18n/pt-BR.json    textos em português
+│   ├── templates/         index, support, 404
+│   └── partials/          head, header, footer (também usados na privacy.html)
+├── tools/assets.py        gera imagens, OG e ícones (só quando uma imagem muda)
+├── CNAME                  domínio próprio: maedodeam.com.br
+└── .nojekyll              o GitHub Pages publica os arquivos como estão
 ```
 
-E-mail institucional, de suporte e de privacidade (em `index.html`, `support.html` e `privacy.html`): `maedodeam@gmail.com`.
+E-mail institucional, de suporte e de privacidade: `maedodeam@gmail.com`.
+
+## Mudar o site
+
+1. Mude o texto em `src/i18n/en.json` **e** em `src/i18n/pt-BR.json` (o inglês é o idioma principal; o
+   português não é tradução literal — escreva as duas versões com naturalidade, com o mesmo sentido).
+   Estrutura e layout ficam em `src/templates/` e `src/partials/`; estilo em `assets/site.css`.
+2. Gere as páginas: `python src/build.py`
+3. Veja localmente: `python -m http.server 8765` e abra `http://localhost:8765/` (e `/pt-br/`).
+   (Abrir o arquivo direto no navegador não funciona bem: os links usam endereços de pasta, como `pt-br/`.)
+4. Antes do commit, `python src/build.py --check` confirma que nada ficou sem gerar.
+
+Nunca edite à mão os arquivos marcados como gerados acima: a próxima geração apaga a mudança. Na
+`privacy.html`, só o que está entre `<!-- build:... -->` e `<!-- /build:... -->` é gerado.
+
+Para mostrar o LinkedIn do fundador na seção "About", preencha `LINKEDIN` no início de `src/build.py`.
+
+### Idiomas e SEO
+
+- Inglês em `/`, português do Brasil em `/pt-br/`, com `lang`, `hreflang` (incluindo `x-default`),
+  `canonical` e Open Graph localizados em cada página, e o `sitemap.xml` com as alternativas.
+- O seletor EN / PT no topo leva à página equivalente no outro idioma. Não há redirecionamento automático.
+- Os idiomas dos produtos (o jogo tem 7) são outra coisa: o site institucional é só EN e PT-BR.
+
+### Imagens
+
+As capturas são do próprio jogo (`TestResults/idiomas` no repositório `stealthgame`, geradas pelo jogo em
+1920×1080, uma por idioma). Para trocar ou adicionar, ajuste `SHOTS` em `tools/assets.py` e rode
+`python tools/assets.py` (precisa de `pip install pillow fonttools brotli`). O script também refaz as imagens
+Open Graph e os ícones. Depois, `python src/build.py`.
 
 ## Política de privacidade do Escritório 17h58
 
-URL oficial: `https://maedodeam.com.br/privacy.html`. A seção `#escritorio-17h58` tem a política em 7 idiomas, um
-`<article>` por idioma, sem JavaScript. O jogo abre a página com o idioma no endereço (`privacy.html#pt-BR`, `#en`, `#es`,
-`#fr`, `#ja`, `#ko`, `#zh-CN`; `PrivacyConfig` no repositório do jogo), e o navegador desce até o bloco daquele idioma.
+URL oficial: `https://maedodeam.com.br/privacy.html`. **Não mude esse endereço nem os `id` dos blocos**: o jogo
+abre a página com o idioma no endereço (`privacy.html#pt-BR`, `#en`, `#es`, `#fr`, `#ja`, `#ko`, `#zh-CN`;
+`PrivacyConfig` no repositório do jogo), e o navegador desce até o bloco daquele idioma. A seção
+`#escritorio-17h58` tem a política em 7 idiomas, um `<article>` por idioma, sem JavaScript.
 
 Ao mudar a política:
 
@@ -31,13 +78,12 @@ Ao mudar a política:
 2. Mude as outras seis com o mesmo sentido (tradução fiel, sem adaptação).
 3. Atualize a data "Última atualização" nos 7 blocos: é a data em que a versão nova é publicada.
 4. Confira se o texto continua de acordo com o jogo e com `docs/PRIVACIDADE.md`, no repositório do jogo.
+5. Rode `python src/build.py` (atualiza só o cabeçalho e o rodapé; o texto da política não é tocado).
 
-Para ver o site localmente, basta abrir `index.html` no navegador.
-(A `404.html` usa caminhos absolutos e só aparece certa no GitHub Pages.)
+## Adicionar outro produto
 
-## Adicionar outro jogo ou produto
-
-- `index.html`: copie o bloco `<li class="product">` do Escritório 17h58 dentro de `<ul class="products">`.
+- Página inicial: copie um `<article class="project">` em `src/templates/index.html`, com os textos novos
+  nos dois JSON, e uma linha no quadro "Currently building" (`.board-row`).
 - `privacy.html`: crie outra `<section id="...">` como a do Escritório 17h58, com a política do produto novo.
 
 ---

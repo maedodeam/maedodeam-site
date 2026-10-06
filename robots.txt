@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://maedodeam.com.br/sitemap.xml
