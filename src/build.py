@@ -62,10 +62,9 @@ def picture(root, name, slug, alt, sizes, loading="lazy"):
     base = f"{root}assets/img/{name}-{slug}"
     avif = ", ".join(f"{base}-{w}.avif {w}w" for w in WIDTHS)
     webp = ", ".join(f"{base}-{w}.webp {w}w" for w in WIDTHS)
-    extra = ' fetchpriority="low"' if loading == "eager" else ""
     return (f'<picture><source type="image/avif" srcset="{avif}" sizes="{sizes}">'
             f'<img src="{base}-1440.webp" srcset="{webp}" sizes="{sizes}" width="1920" height="1080" '
-            f'alt="{html.escape(alt, quote=True)}" loading="{loading}" decoding="async"{extra}></picture>')
+            f'alt="{html.escape(alt, quote=True)}" loading="{loading}" decoding="async"></picture>')
 
 
 def seo(t, url, alternates, og_image, og_locale, og_alt_locales, og_alt):

@@ -7,7 +7,7 @@
 <body>
 {{> header}}
 
-<main id="main">
+<main id="main" tabindex="-1">
 
   <!-- 00 · Hero -->
   <section class="hero" aria-labelledby="hero-title">
@@ -89,7 +89,7 @@
               <p class="project-aka mono">{{t.e1758.aka}}</p>
             </div>
             <ul class="tags" aria-label="Tags">
-              <li>Game design</li><li>Unity</li><li>Multiplatform</li><li>Steam</li><li>Product development</li>
+              <li>Game design</li><li>Unity</li><li>PC</li><li>Steam</li><li>Cross-platform builds</li><li>Product development</li>
             </ul>
           </header>
 
@@ -121,7 +121,8 @@
             <dl class="spec" data-reveal style="--d: 1">
               <div><dt>{{t.e1758.spec_genre}}</dt><dd>{{t.e1758.spec_genre_v}}</dd></div>
               <div><dt>{{t.e1758.spec_engine}}</dt><dd>Unity 6 · URP</dd></div>
-              <div><dt>{{t.e1758.spec_platforms}}</dt><dd>{{t.e1758.spec_platforms_v}}</dd></div>
+              <div><dt>{{t.e1758.spec_platform}}</dt><dd>{{t.e1758.spec_platform_v}}</dd></div>
+              <div><dt>{{t.e1758.spec_builds}}</dt><dd>{{t.e1758.spec_builds_v}}</dd></div>
               <div><dt>{{t.e1758.spec_languages}}</dt><dd>{{t.e1758.spec_languages_v}}</dd></div>
               <div><dt>{{t.e1758.spec_levels}}</dt><dd>{{t.e1758.spec_levels_v}}</dd></div>
               <div><dt>{{t.e1758.spec_music}}</dt><dd>{{t.e1758.spec_music_v}}</dd></div>
@@ -152,23 +153,15 @@
                 <ul class="sysmap-apps">
                   <li>{{t.cotaria.app1}}</li><li>{{t.cotaria.app2}}</li><li>{{t.cotaria.app3}}</li>
                 </ul>
-                <p class="sysmap-api"><span class="mono">API</span><span>NestJS · Prisma · PostgreSQL · Redis</span></p>
-                <ol class="sysmap-flow">
-                  <li style="--i: 0"><span class="mono">01</span>{{t.cotaria.f1}}</li>
-                  <li style="--i: 1"><span class="mono">02</span>{{t.cotaria.f2}}</li>
-                  <li style="--i: 2"><span class="mono">03</span>{{t.cotaria.f3}}</li>
-                  <li style="--i: 3" class="core"><span class="mono">04</span>{{t.cotaria.f4}}</li>
-                  <li style="--i: 4"><span class="mono">05</span>{{t.cotaria.f5}}</li>
-                  <li style="--i: 5"><span class="mono">06</span>{{t.cotaria.f6}}</li>
-                  <li style="--i: 6"><span class="mono">07</span>{{t.cotaria.f7}}</li>
-                </ol>
-                <ul class="sysmap-rails">
-                  <li><span class="mono">{{t.cotaria.rail1_k}}</span><span>{{t.cotaria.rail1}}</span></li>
-                  <li><span class="mono">{{t.cotaria.rail2_k}}</span><span>{{t.cotaria.rail2}}</span></li>
+                <p class="sysmap-api"><span class="mono">web</span><span>React · TypeScript</span></p>
+                <p class="sysmap-api"><span class="mono">api</span><span>NestJS · Prisma</span></p>
+                <ul class="sysmap-svc">
+                  <li style="--i: 0">{{t.cotaria.svc1}}</li>
+                  <li style="--i: 1">{{t.cotaria.svc2}}</li>
+                  <li style="--i: 2">{{t.cotaria.svc3}}</li>
+                  <li style="--i: 3">{{t.cotaria.svc4}}</li>
                 </ul>
-                <ol class="sysmap-trace seq mono">
-                  <li>{{t.cotaria.trace1}}</li><li>{{t.cotaria.trace2}}</li><li>{{t.cotaria.trace3}}</li>
-                </ol>
+                <p class="sysmap-api"><span class="mono">data</span><span>PostgreSQL · Redis</span></p>
               </div>
               <figcaption><span class="mono">{{t.ui.fig}} 04</span><span>{{t.cotaria.cap}}</span></figcaption>
             </figure>
@@ -177,7 +170,6 @@
               <div><dt>{{t.cotaria.spec_type}}</dt><dd>{{t.cotaria.spec_type_v}}</dd></div>
               <div><dt>{{t.cotaria.spec_apps}}</dt><dd>{{t.cotaria.spec_apps_v}}</dd></div>
               <div><dt>{{t.cotaria.spec_stack}}</dt><dd>TypeScript · NestJS · Prisma · PostgreSQL · Redis · React · Docker</dd></div>
-              <div><dt>{{t.cotaria.spec_quality}}</dt><dd>{{t.cotaria.spec_quality_v}}</dd></div>
               <div class="status"><dt>{{t.cotaria.spec_status}}</dt><dd><span class="led led--pulse" aria-hidden="true"></span>{{t.cotaria.spec_status_v}}</dd></div>
             </dl>
           </div>
@@ -246,7 +238,7 @@
     <div class="wrap">
       <header class="section-head">
         <p class="label"><span>{{t.about.label}}</span><span>{{t.about.label_right}}</span></p>
-        <h2 class="section-title" id="about-title" data-reveal>{{t.about.title}}</h2>
+        <h2 class="section-title section-title--wide" id="about-title" data-reveal>{{t.about.title}}</h2>
       </header>
       <div class="about-grid">
         <div class="about-copy" data-reveal>
@@ -271,7 +263,7 @@
     <div class="wrap">
       <header class="section-head">
         <p class="label"><span>{{t.contact.label}}</span><span>{{t.contact.label_right}}</span></p>
-        <h2 class="section-title" id="contact-title" data-reveal>{{t.contact.title}}</h2>
+        <h2 class="section-title section-title--wide" id="contact-title" data-reveal>{{t.contact.title}}</h2>
       </header>
 
       <ul class="asks">
