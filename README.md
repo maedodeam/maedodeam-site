@@ -111,6 +111,23 @@ O `assets/play/game.js` gerado vai para o repositório, como os HTML: o GitHub P
 
 ## Publicação
 
+**Só os arquivos do site.** `python tools/dist.py` monta em `_site/` apenas o que o site usa (HTML gerados,
+`assets/`, ícones, `robots.txt`, `sitemap.xml`, `CNAME`) e falha se aparecer fonte, teste, Markdown,
+`package.json`, source map, galeria de desenvolvimento ou página sem CSP. `python tools/dist.py --list` mostra a lista.
+O workflow `.github/workflows/pages.yml` publica esse `_site/` pelo GitHub Actions (só em push na `main` ou
+manualmente, nunca em pull request; token com permissão mínima por job; ações oficiais fixadas por SHA).
+
+**Segurança do repositório** (público de propósito: qualquer um pode ver, clonar e fazer fork; só quem tem
+escrita altera o original):
+
+- ruleset "Proteger main": a branch `main` não pode ser apagada nem receber force push (vale também para admins;
+  push normal continua direto, sem precisar de aprovação);
+- `GITHUB_TOKEN` padrão somente leitura e sem poder aprovar pull requests;
+- workflows de pull requests de fora só rodam depois de aprovação manual;
+- ambiente `github-pages` aceita deploy só da `main`;
+- secret scanning e push protection ligados (o GitHub bloqueia push com token/chave conhecida);
+- CSP em todas as páginas; `tools/dist.py` e `game/scripts/build.ts` barram APIs de armazenamento/rede no jogo.
+
 Os valores abaixo foram conferidos na documentação oficial do GitHub Pages em 2026-10-03.
 Antes de configurar, confira de novo, porque o GitHub pode mudá-los:
 

@@ -3,6 +3,7 @@
 import { build } from "esbuild";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { GALLERY_HTML } from "../dev/gallery-page.ts";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -70,5 +71,6 @@ if (dev) {
     outfile: join(root, "game/.dev/gallery.js"),
     sourcemap: true,
   });
-  console.log("game/.dev/gallery.js");
+  writeFileSync(join(root, "game/.dev/gallery.html"), GALLERY_HTML);
+  console.log("game/.dev/gallery.js + gallery.html");
 }

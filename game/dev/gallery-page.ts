@@ -1,7 +1,10 @@
-<!doctype html>
+// Página da galeria de desenvolvimento. Não fica no repositório como .html (tudo no repositório é publicado
+// pelo GitHub Pages): é gerada em game/.dev/gallery.html (ignorado pelo git) e servida pelos scripts de teste.
+export const GALLERY_HTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="robots" content="noindex">
 <title>Microgame gallery (dev)</title>
 <link rel="stylesheet" href="/assets/site.css">
 <style>
@@ -22,3 +25,4 @@
 <script src="/game/.dev/gallery.js"></script>
 </body>
 </html>
+`;

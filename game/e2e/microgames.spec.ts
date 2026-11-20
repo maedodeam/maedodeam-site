@@ -8,7 +8,7 @@ for (const stage of ["landscape", "portrait"] as const) {
     test.slow();
     const errs: string[] = [];
     page.on("pageerror", (e) => errs.push(String(e)));
-    await page.goto(`/game/dev/gallery.html?stage=${stage}&level=1&bot=win&times=1&cell=120`);
+    await page.goto(`/game/.dev/gallery.html?stage=${stage}&level=1&bot=win&times=1&cell=120`);
     await page.waitForSelector("body[data-done]", { timeout: 170_000 });
     const rows = await page.locator(".row h2").allTextContents();
     expect(rows.length).toBeGreaterThanOrEqual(100);

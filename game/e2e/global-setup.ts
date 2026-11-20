@@ -1,5 +1,7 @@
 // Gera a galeria de desenvolvimento (bundle com bots) usada pelo teste que roda os 100 microgames no navegador.
 import { build } from "esbuild";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { GALLERY_HTML } from "../dev/gallery-page.ts";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,4 +16,6 @@ export default async function globalSetup(): Promise<void> {
     outfile: join(root, "game/.dev/gallery.js"),
     logLevel: "error",
   });
+  mkdirSync(join(root, "game/.dev"), { recursive: true });
+  writeFileSync(join(root, "game/.dev/gallery.html"), GALLERY_HTML);
 }

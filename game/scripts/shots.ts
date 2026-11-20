@@ -10,6 +10,7 @@ import { readFileSync, mkdtempSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { GALLERY_HTML } from "../dev/gallery-page.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const args = process.argv.slice(2);
@@ -57,11 +58,12 @@ page.on("console", (m) => {
 });
 await page.route("http://mm.local/**", (route) => {
   const path = decodeURIComponent(new URL(route.request().url()).pathname);
+  if (path === "/game/.dev/gallery.html") return route.fulfill({ status: 200, body: GALLERY_HTML, contentType: "text/html" });
   const file = path === "/game/.dev/gallery.js" ? bundle : join(root, path);
   if (!existsSync(file)) return route.fulfill({ status: 404, body: "not found" });
   return route.fulfill({ status: 200, body: readFileSync(file), contentType: TYPES[extname(file)] ?? "application/octet-stream" });
 });
-await page.goto(`http://mm.local/game/dev/gallery.html?${params}`);
+await page.goto(`http://mm.local/game/.dev/gallery.html?${params}`);
 await page.waitForSelector("body[data-done]", { timeout: 120000 });
 await page.evaluate(() => document.fonts.ready);
 await page.screenshot({ path: out, fullPage: true });

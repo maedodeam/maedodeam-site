@@ -24,6 +24,13 @@ for (const [path, lang, play] of [
   });
 }
 
+test("o atalho perto do título abre o jogo", async ({ page }) => {
+  await page.goto("/pt-br/");
+  await page.locator(".hero-play-btn").click();
+  await expect(page).toHaveURL(/\/pt-br\/play\/$/);
+  await expect(page.locator("#mm")).toHaveAttribute("data-ready", "true");
+});
+
 test("a chamada da home abre o jogo na mesma aba", async ({ page }) => {
   await page.goto("/");
   await page.locator(".arcade-btn").click();
@@ -40,4 +47,28 @@ test("política de privacidade: os links do jogo Escritório 17h58 continuam fun
     expect(top).toBeGreaterThanOrEqual(0);
     expect(top).toBeLessThan(200);
   }
+});
+
+test("CSP: todas as páginas têm a política, nada legítimo é bloqueado e código injetado não roda", async ({ page }) => {
+  await page.addInitScript(() => {
+    (window as unknown as { __csp: string[] }).__csp = [];
+    document.addEventListener("securitypolicyviolation", (e) => (window as unknown as { __csp: string[] }).__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+  });
+  for (const path of ["/", "/pt-br/", "/support.html", "/privacy.html", "/404.html", "/play/", "/pt-br/play/"]) {
+    await page.goto(path);
+    await expect(page.locator('meta[http-equiv="Content-Security-Policy"]')).toHaveCount(1);
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp), path).toEqual([]);
+  }
+  // um script injetado na página (como num ataque de XSS) é bloqueado
+  const ran = await page.evaluate(async () => {
+    const w = window as unknown as { __pwned?: boolean; __csp: string[] };
+    const s = document.createElement("script");
+    s.textContent = "window.__pwned = true";
+    document.body.append(s);
+    await new Promise((r) => setTimeout(r, 50));
+    return { pwned: !!w.__pwned, violations: w.__csp.length };
+  });
+  expect(ran.pwned).toBe(false);
+  expect(ran.violations).toBeGreaterThan(0);
 });
