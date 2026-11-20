@@ -1,0 +1,23 @@
+{
+  "name": "site-tooling",
+  "private": true,
+  "description": "Dev tooling for the static site's /play game. Nothing here runs in production.",
+  "type": "module",
+  "scripts": {
+    "build": "node game/scripts/build.ts && python src/build.py",
+    "build:game": "node game/scripts/build.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --import ./game/tests/helpers/setup.ts --test --test-reporter=dot \"game/tests/**/*.test.ts\"",
+    "e2e": "playwright test -c game/e2e/playwright.config.ts",
+    "check": "npm run typecheck && npm test && npm run build && python src/build.py --check"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "22.20.5",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

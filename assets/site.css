@@ -222,7 +222,16 @@ ul, ol { padding: 0; list-style: none; }
   background: var(--accent);
 }
 .site-nav .nav-cta { color: var(--text); }
-.site-nav li:not(.nav-cta-item) { display: none; }
+.site-nav li:not(.nav-cta-item):not(.nav-play-item) { display: none; }
+.site-nav .nav-play { display: inline-flex; align-items: center; gap: .45rem; }
+.site-nav .nav-play::before {
+  content: "";
+  width: .5rem;
+  height: .5rem;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: rotate(45deg);
+}
 
 .lang {
   display: flex;
@@ -344,6 +353,23 @@ ul, ol { padding: 0; list-style: none; }
 }
 .hero-title .line { display: block; white-space: nowrap; }
 .hero-title .dot { color: var(--accent); }
+
+/* atalho para o jogo: no celular logo abaixo do título; no computador no topo da coluna da direita */
+.hero-side { display: contents; }
+.hero-play { order: 1; display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; margin: 0; }
+.hero-play-btn { gap: 1rem; border-color: var(--text); }
+.hero-play-btn::before {
+  content: "";
+  width: .55rem;
+  height: .55rem;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: rotate(45deg);
+  margin-right: -.25rem;
+}
+.hero-play-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.hero-play-btn:hover::before { background: var(--accent-ink); }
+.hero-play-note { color: var(--muted); font-size: .8125rem; }
 
 .hero-index {
   display: grid;
@@ -472,10 +498,18 @@ ul, ol { padding: 0; list-style: none; }
   .hero-grid > * { order: 0; }
   .hero-meta { grid-column: 1 / -1; }
   .hero-title { grid-column: 1 / -1; grid-row: 2; font-size: min(calc((100vw - 2 * var(--gutter)) / (var(--chars, 7) * .5) * .62), 13.5rem, 27vh); }
-  .bench {
+  .hero-side {
     grid-column: 9 / -1;
     grid-row: 2;
-    align-self: end;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+  .hero-play { flex-direction: column; align-items: stretch; gap: .6rem; padding-top: .4rem; }
+  .hero-play-note { text-align: right; }
+  .bench {
     grid-template-columns: 1fr;
     gap: .9rem;
     padding: .9rem .9rem 1.1rem;
@@ -793,6 +827,63 @@ ul, ol { padding: 0; list-style: none; }
   .board-row .led { margin-top: 0; }
   .board-type, .board-next, .stages { grid-column: auto; }
   .stages { margin: 0; }
+}
+
+/* ---------- Fliperama (chamada para /play) ---------- */
+
+.arcade {
+  position: relative;
+  overflow: hidden;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-block: 1px solid var(--line);
+}
+.arcade-marquee {
+  display: flex;
+  white-space: nowrap;
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 62%;
+  font-size: clamp(3rem, 9vw, 6.5rem);
+  line-height: 1;
+  padding-top: clamp(1.25rem, 3vw, 2rem);
+  color: color-mix(in srgb, var(--accent-ink) 22%, var(--accent));
+  user-select: none;
+}
+.arcade-marquee span { flex: none; padding-right: .3em; }
+@media (prefers-reduced-motion: no-preference) {
+  .arcade-marquee span { animation: marquee 38s linear infinite; }
+}
+@keyframes marquee { to { transform: translateX(-100%); } }
+.arcade-inner {
+  display: grid;
+  gap: 2rem;
+  padding-block: clamp(1.5rem, 4vw, 2.5rem) clamp(3rem, 7vw, 4.5rem);
+}
+.arcade .label { color: var(--accent-ink); opacity: .75; }
+.arcade-title {
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 62%;
+  text-transform: uppercase;
+  font-size: clamp(3rem, 9vw, 6.5rem);
+  line-height: .86;
+  margin: .6rem 0 1rem;
+}
+.arcade-text { max-width: 34rem; font-size: clamp(1.0625rem, 1.6vw, 1.1875rem); font-weight: 500; }
+.arcade-actions { display: grid; gap: .9rem; align-content: end; justify-items: start; }
+.arcade-btn {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: var(--text);
+  box-shadow: 6px 7px 0 color-mix(in srgb, var(--accent-ink) 35%, var(--accent));
+}
+.arcade-btn:hover { background: var(--text); border-color: var(--text); color: var(--accent-ink); }
+.arcade-meta { opacity: .75; }
+@media (min-width: 60rem) {
+  .arcade-inner { grid-template-columns: repeat(12, 1fr); column-gap: 1.5rem; }
+  .arcade-copy { grid-column: 1 / 8; }
+  .arcade-actions { grid-column: 9 / -1; }
 }
 
 /* ---------- Sobre ---------- */

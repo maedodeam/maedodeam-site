@@ -10,6 +10,7 @@ Templates: {{ chave }} insere o texto como HTML, {{ chave|e }} insere escapado (
 import hashlib
 import html
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -18,7 +19,9 @@ from urllib.parse import quote
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 SITE = "https://maedodeam.com.br"
-EMAIL = "maedodeam@gmail.com"
+# E-mail de contato publicado no site. Fica fora do código, numa variável de ambiente definida por quem
+# roda o build (ex.: setx SITE_CONTACT_EMAIL "contato@exemplo.com" no Windows, e reabrir o terminal).
+EMAIL = os.environ.get("SITE_CONTACT_EMAIL", "").strip()
 LINKEDIN = ""  # ex.: "https://www.linkedin.com/in/..." — vazio esconde o link
 
 LANGS = {
@@ -134,16 +137,16 @@ def jsonld(t, lang, url):
     return '<script type="application/ld+json">' + json.dumps(data, ensure_ascii=False) + "</script>"
 
 
-def version():
+def version(*files):
     h = hashlib.sha1()
-    for f in ("assets/site.css", "assets/site.js"):
+    for f in files or ("assets/site.css", "assets/site.js"):
         h.update((ROOT / f).read_bytes())
     return h.hexdigest()[:8]
 
 
 def build():
     out = {}
-    site = {"version": version()}
+    site = {"version": version(), "play_version": version("assets/play/game.js", "assets/play/play.css"), "email": EMAIL}
     texts = {lang: load(lang) for lang in LANGS}
 
     for lang, cfg in LANGS.items():
@@ -167,7 +170,7 @@ def build():
         linkedin = (f'<a class="label" href="{LINKEDIN}" rel="me noopener">{t["about"]["linkedin"]}</a>' if LINKEDIN else "")
 
         page = {
-            "lang": lang, "root": root, "home": "./", "anchors": "", "support": "support.html",
+            "lang": lang, "root": root, "home": "./", "anchors": "", "support": "support.html", "play": "play/",
             "title": t["meta"]["title"], "description": t["meta"]["description"],
             "seo": seo(t, url, alternates, og_image, cfg["og_locale"], alt_locales, t["meta"]["og_alt"]),
             "lang_switch": switch("", "pt-br/"),
@@ -189,10 +192,24 @@ def build():
         tpl = (SRC / "templates" / "support.html").read_text(encoding="utf-8")
         out[f"{cfg['dir']}support.html"] = render(tpl, {"t": st, "page": spage, "site": site}).replace("{root}", root)
 
+        # Jogo: Microgame Mayhem (/play/ e /pt-br/play/). O jogo em si é o bundle assets/play/game.js.
+        p_url = f"{SITE}/{cfg['dir']}play/"
+        p_alt = [("en", f"{SITE}/play/"), ("pt-BR", f"{SITE}/pt-br/play/"), ("x-default", f"{SITE}/play/")]
+        pt_ = dict(t, meta=dict(t["meta"], title=t["play"]["meta_title"], description=t["play"]["meta_description"]))
+        proot = root + "../"
+        ppage = {
+            "lang": lang, "root": proot, "home": "../",
+            "title": pt_["meta"]["title"], "description": pt_["meta"]["description"],
+            "seo": seo(pt_, p_url, p_alt, og_image, cfg["og_locale"], alt_locales, t["play"]["og_alt"]),
+            "lang_switch": lang_switch(lang, {"en": ("EN", proot + "play/"), "pt-BR": ("PT", proot + "pt-br/play/")}, t["ui"]["lang_label"]),
+        }
+        tpl = (SRC / "templates" / "play.html").read_text(encoding="utf-8")
+        out[f"{cfg['dir']}play/index.html"] = render(tpl, {"t": pt_, "page": ppage, "site": site})
+
     # 404 (o GitHub Pages serve em qualquer caminho: endereços absolutos)
     t = texts["en"]
     page404 = {
-        "lang": "en", "root": "/", "home": "/", "anchors": "/", "support": "/support.html",
+        "lang": "en", "root": "/", "home": "/", "anchors": "/", "support": "/support.html", "play": "/play/",
         "title": "Not found — MAEDODEAM", "description": t["meta"]["description"], "seo": "",
         "lang_switch": lang_switch("en", {"en": ("EN", "/"), "pt-BR": ("PT", "/pt-br/")}, t["ui"]["lang_label"]),
     }
@@ -202,7 +219,7 @@ def build():
     # Política de privacidade: o texto é mantido à mão; só o cabeçalho e o rodapé vêm daqui
     pp = (ROOT / "privacy.html").read_text(encoding="utf-8")
     ppage = {
-        "lang": "en", "root": "", "home": "./", "anchors": "./", "support": "support.html",
+        "lang": "en", "root": "", "home": "./", "anchors": "./", "support": "support.html", "play": "play/",
         "title": "Privacy Policy · Política de privacidade — MAEDODEAM",
         "description": "Official privacy policy for MAEDODEAM products, including the game Escritório 17h58. Política de privacidade oficial dos produtos da MAEDODEAM.",
         "seo": f'<link rel="canonical" href="{SITE}/privacy.html">', "lang_switch": "",
@@ -217,7 +234,7 @@ def build():
 
     # Sitemap e robots
     urls = []
-    for path in ("", "support.html"):
+    for path in ("", "play/", "support.html"):
         en, pt = f"{SITE}/{path}", f"{SITE}/pt-br/{path}"
         for loc in (en, pt):
             urls.append(
@@ -234,6 +251,8 @@ def build():
 
 
 def main():
+    if not EMAIL or "@" not in EMAIL:
+        sys.exit("Defina a variável de ambiente SITE_CONTACT_EMAIL com o e-mail de contato do site.")
     check = "--check" in sys.argv
     stale = []
     for rel, content in build().items():

@@ -22,13 +22,17 @@ maedodeam-site/
 │   ├── fonts/             Archivo e JetBrains Mono (variáveis, subconjunto latino, licença OFL)
 │   ├── img/               capturas do jogo em AVIF e WebP, 4 larguras, HUD em EN e PT-BR
 │   └── og-en.jpg, og-pt-br.jpg   imagens de compartilhamento (Open Graph)
+├── play/index.html        jogo Microgame Mayhem (EN) · pt-br/play/index.html (PT-BR)   ← gerado
+├── assets/play/           game.js (bundle do jogo, gerado) e play.css
 ├── favicon.svg, favicon.ico, apple-touch-icon.png
 ├── src/
 │   ├── build.py           gera as páginas
 │   ├── i18n/en.json       textos em inglês
 │   ├── i18n/pt-BR.json    textos em português
-│   ├── templates/         index, support, 404
+│   ├── templates/         index, support, play, 404
 │   └── partials/          head, header, footer (também usados na privacy.html)
+├── game/                  código-fonte do jogo em TypeScript, testes e catálogo (ver game/README.md)
+├── package.json           ferramentas de desenvolvimento do jogo (esbuild, TypeScript, Playwright)
 ├── tools/assets.py        gera imagens, OG e ícones (só quando uma imagem muda)
 ├── CNAME                  domínio próprio: maedodeam.com.br
 └── .nojekyll              o GitHub Pages publica os arquivos como estão
@@ -41,7 +45,9 @@ E-mail institucional, de suporte e de privacidade: `maedodeam@gmail.com`.
 1. Mude o texto em `src/i18n/en.json` **e** em `src/i18n/pt-BR.json` (o inglês é o idioma principal; o
    português não é tradução literal — escreva as duas versões com naturalidade, com o mesmo sentido).
    Estrutura e layout ficam em `src/templates/` e `src/partials/`; estilo em `assets/site.css`.
-2. Gere as páginas: `python src/build.py`
+2. Gere as páginas: `python src/build.py`. O e-mail de contato publicado vem da variável de ambiente
+   `SITE_CONTACT_EMAIL` (definida uma vez com `setx SITE_CONTACT_EMAIL "..."` no Windows, reabrindo o
+   terminal depois); sem ela, o build para com um aviso.
 3. Veja localmente: `python -m http.server 8765` e abra `http://localhost:8765/` (e `/pt-br/`).
    (Abrir o arquivo direto no navegador não funciona bem: os links usam endereços de pasta, como `pt-br/`.)
 4. Antes do commit, `python src/build.py --check` confirma que nada ficou sem gerar.
@@ -79,6 +85,21 @@ Ao mudar a política:
 3. Atualize a data "Última atualização" nos 7 blocos: é a data em que a versão nova é publicada.
 4. Confira se o texto continua de acordo com o jogo e com `docs/PRIVACIDADE.md`, no repositório do jogo.
 5. Rode `python src/build.py` (atualiza só o cabeçalho e o rodapé; o texto da política não é tocado).
+
+## Jogo: Microgame Mayhem (`/play/`)
+
+Jogo de 100 microgames que roda no navegador, sem backend, sem rede depois do carregamento e sem guardar nada.
+O código fica em `game/` (TypeScript); a arquitetura, o contrato dos microgames e o processo de verificação
+estão em `game/README.md`, e o catálogo completo em `game/CATALOG.md`.
+
+```bash
+npm install          # uma vez: esbuild, TypeScript e Playwright (só desenvolvimento)
+npm test             # testes de todos os microgames e do motor
+npm run build        # gera assets/play/game.js e as páginas do site
+npm run e2e          # testes de ponta a ponta (desktop e celular) com o site servido localmente
+```
+
+O `assets/play/game.js` gerado vai para o repositório, como os HTML: o GitHub Pages continua sem etapa de build.
 
 ## Adicionar outro produto
 

@@ -30,8 +30,8 @@
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/site.css?v=58987b5c">
-<script src="assets/site.js?v=58987b5c" defer></script>
+<link rel="stylesheet" href="assets/site.css?v=13e8bdb9">
+<script src="assets/site.js?v=13e8bdb9" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://maedodeam.com.br/#org", "name": "MAEDODEAM", "legalName": "MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA", "url": "https://maedodeam.com.br/", "logo": "https://maedodeam.com.br/apple-touch-icon.png", "email": "maedodeam@gmail.com", "description": "Independent technology company building software, products, games and experiments.", "founder": {"@type": "Person", "name": "Roger Maedo", "jobTitle": "Founder"}}, {"@type": "WebSite", "@id": "https://maedodeam.com.br/#website", "url": "https://maedodeam.com.br/", "name": "MAEDODEAM", "inLanguage": "en", "publisher": {"@id": "https://maedodeam.com.br/#org"}}]}</script>
 </head>
 <body>
@@ -44,6 +44,7 @@
         <li><a href="#work">Work</a></li>
         <li><a href="#now">Now</a></li>
         <li><a href="#about">About</a></li>
+        <li class="nav-play-item"><a class="nav-play" href="play/">Play</a></li>
         <li class="nav-cta-item"><a class="nav-cta" href="#contact">Contact</a></li>
       </ul>
     </nav>
@@ -67,6 +68,12 @@
         <span class="line">things<span class="dot">.</span></span>
       </h1>
 
+      <div class="hero-side">
+      <p class="hero-play">
+        <a class="btn arrow hero-play-btn" href="play/">Play something weird</a>
+        <span class="hero-play-note mono">100 microgames · No install</span>
+      </p>
+
       <a class="bench ticks" href="#escritorio-17h58">
         <picture><source type="image/avif" srcset="assets/img/e1758-desk-en-640.avif 640w, assets/img/e1758-desk-en-960.avif 960w, assets/img/e1758-desk-en-1440.avif 1440w, assets/img/e1758-desk-en-1920.avif 1920w" sizes="(min-width: 64rem) 28rem, 7.5rem"><img src="assets/img/e1758-desk-en-1440.webp" srcset="assets/img/e1758-desk-en-640.webp 640w, assets/img/e1758-desk-en-960.webp 960w, assets/img/e1758-desk-en-1440.webp 1440w, assets/img/e1758-desk-en-1920.webp 1920w" sizes="(min-width: 64rem) 28rem, 7.5rem" width="1920" height="1080" alt="Escritório 17h58 gameplay screenshot" loading="eager" decoding="async"></picture>
         <span>
@@ -77,6 +84,7 @@
           </span>
         </span>
       </a>
+      </div>
 
       <ul class="hero-index">
         <li><span class="mono">01</span><strong>Software.</strong><span>Systems that hold up in production.</span></li>
@@ -104,7 +112,7 @@
   <section class="manifesto" aria-labelledby="manifesto-title">
     <div class="wrap manifesto-inner">
       <h2 class="manifesto-title" id="manifesto-title" data-reveal>Ideas are cheap. <span>Working products aren't.</span></h2>
-      <p class="manifesto-text" data-reveal style="--d: 1">We don't sell hours. We design, build and ship things that work — our own products first, and now and then one with the right partner.</p>
+      <p class="manifesto-text" data-reveal style="--d: 1">We design, build and ship things that work.</p>
       <ol class="loop" data-reveal style="--d: 2">
         <li><span class="mono">01 /</span><strong>Build</strong><span>Make the thing.</span></li>
         <li><span class="mono">02 /</span><strong>Test</strong><span>Break it on purpose.</span></li>
@@ -277,6 +285,22 @@
     </div>
   </section>
 
+  <!-- Fliperama: Microgame Mayhem -->
+  <section class="arcade" aria-labelledby="arcade-title">
+    <div class="arcade-marquee" aria-hidden="true"><span>SWAT! · DODGE! · POUR! · SLICE! · JUMP! · REPEAT! · FILE IT! · SOLVE! · HOLD IT! · DON'T TOUCH! · SWAT! · DODGE! · POUR! · SLICE! · JUMP! · REPEAT! · FILE IT! · SOLVE! · HOLD IT! · DON'T TOUCH! · </span><span>SWAT! · DODGE! · POUR! · SLICE! · JUMP! · REPEAT! · FILE IT! · SOLVE! · HOLD IT! · DON'T TOUCH! · SWAT! · DODGE! · POUR! · SLICE! · JUMP! · REPEAT! · FILE IT! · SOLVE! · HOLD IT! · DON'T TOUCH! · </span></div>
+    <div class="wrap arcade-inner">
+      <div class="arcade-copy">
+        <p class="label">Coffee break</p>
+        <h2 class="arcade-title" id="arcade-title">Microgame Mayhem</h2>
+        <p class="arcade-text">100 tiny games built in-house. Four lives, no saves, and each game lasts about as long as your attention span. Works with mouse, keyboard or touch.</p>
+      </div>
+      <div class="arcade-actions">
+        <a class="btn btn--big arcade-btn arrow" href="play/">Play now</a>
+        <p class="arcade-meta mono">Browser game · Desktop & mobile · No sign-up</p>
+      </div>
+    </div>
+  </section>
+
   <!-- 03 · Sobre -->
   <section class="section" id="about" aria-labelledby="about-title">
     <div class="wrap">
@@ -366,6 +390,7 @@
         <ul>
           <li><a href="#escritorio-17h58">Escritório 17h58</a></li>
           <li><a href="#cotaria">Cotaria</a></li>
+          <li><a href="play/">Microgame Mayhem</a></li>
         </ul>
       </nav>
     </div>

@@ -1,1 +1,5 @@
 .claude/
+node_modules/
+game/.dev/
+test-results/
+playwright-report/

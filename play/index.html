@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Microgame Mayhem — MAEDODEAM</title>
+<meta name="description" content="100 tiny games, 4 lives, no saves. A fast, silly microgame marathon made by MAEDODEAM. Plays in the browser on desktop and mobile.">
+<meta name="theme-color" content="#0d0d0b">
+<meta name="color-scheme" content="dark">
+<link rel="canonical" href="https://maedodeam.com.br/play/">
+<link rel="alternate" hreflang="en" href="https://maedodeam.com.br/play/">
+<link rel="alternate" hreflang="pt-BR" href="https://maedodeam.com.br/pt-br/play/">
+<link rel="alternate" hreflang="x-default" href="https://maedodeam.com.br/play/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MAEDODEAM">
+<meta property="og:title" content="Microgame Mayhem — MAEDODEAM">
+<meta property="og:description" content="100 tiny games, 4 lives, no saves. A fast, silly microgame marathon made by MAEDODEAM. Plays in the browser on desktop and mobile.">
+<meta property="og:url" content="https://maedodeam.com.br/play/">
+<meta property="og:image" content="https://maedodeam.com.br/assets/og-en.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Microgame Mayhem — 100 tiny games by MAEDODEAM.">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Microgame Mayhem — MAEDODEAM">
+<meta name="twitter:description" content="100 tiny games, 4 lives, no saves. A fast, silly microgame marathon made by MAEDODEAM. Plays in the browser on desktop and mobile.">
+<meta name="twitter:image" content="https://maedodeam.com.br/assets/og-en.jpg">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preload" href="../assets/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/site.css?v=13e8bdb9">
+<link rel="stylesheet" href="../assets/play/play.css?v=857509f0">
+<script src="../assets/play/game.js?v=857509f0" defer></script>
+</head>
+<body class="mm-page">
+<div id="mm" class="mm" data-screen="title" data-phase="title">
+  <div class="mm-stage" id="mm-stage">
+    <canvas id="mm-canvas" class="mm-canvas" tabindex="-1" role="img" aria-label="Microgame Mayhem game area"></canvas>
+  </div>
+
+  <div class="mm-bar">
+    <button id="mm-pause" class="mm-icon" type="button" aria-label="Pause" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    </button>
+    <button id="mm-sound" class="mm-icon" type="button" aria-label="Sound" aria-pressed="true" data-on="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="mm-wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke-width="2"/><path class="mm-mute" d="M16 9l6 6M22 9l-6 6" fill="none" stroke-width="2"/></svg>
+    </button>
+    <button id="mm-full" class="mm-icon" type="button" aria-label="Full screen" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke-width="2.2"/></svg>
+    </button>
+  </div>
+
+  <section id="mm-title" class="mm-screen mm-title" aria-labelledby="mm-logo">
+    <a class="mm-back" href="../">Back to MAEDODEAM</a>
+    <div class="mm-hero">
+      <p class="mm-kicker">MAEDODEAM_ · Arcade</p>
+      <h1 class="mm-logo" id="mm-logo"><span>Microgame</span> <span>Mayhem<i>!</i></span></h1>
+      <button id="mm-play" class="mm-btn mm-btn--play" type="button" disabled>Loading…</button>
+      <p class="mm-controls" id="mm-controls">Mouse, keyboard or touch. Each game tells you how.</p>
+    </div>
+    <div class="mm-foot">
+      <p class="mm-note">Nothing is stored. Close the page and it's gone.</p>
+      <div class="lang" role="group" aria-label="Language"><span lang="en" aria-current="true">EN</span><span aria-hidden="true">/</span><a href="../pt-br/play/" hreflang="pt-BR" lang="pt-BR">PT</a></div>
+    </div>
+    <noscript><p class="mm-noscript">Microgame Mayhem needs JavaScript to run.</p></noscript>
+  </section>
+
+  <section id="mm-paused" class="mm-screen mm-card" aria-labelledby="mm-paused-h" hidden>
+    <h2 id="mm-paused-h" class="mm-h">Paused</h2>
+    <button id="mm-resume" class="mm-btn mm-btn--play" type="button">Resume</button>
+    <button id="mm-quit" class="mm-btn mm-btn--ghost" type="button">Quit to title</button>
+    <a class="mm-back" href="../">Back to MAEDODEAM</a>
+  </section>
+
+  <section id="mm-over" class="mm-screen mm-card" aria-labelledby="mm-over-h" hidden>
+    <h2 id="mm-over-h" class="mm-h">Game over</h2>
+    <p class="mm-score"><span class="mm-label">Score</span> <strong id="mm-score">0</strong></p>
+    <p class="mm-newbest" id="mm-newbest" hidden>New session best!</p>
+    <dl class="mm-stats">
+      <div><dt>Cleared</dt><dd id="mm-cleared">0</dd></div>
+      <div><dt>Played</dt><dd id="mm-played">0</dd></div>
+      <div><dt>Best this session</dt><dd id="mm-best">0</dd></div>
+    </dl>
+    <p class="mm-lostto"><span class="mm-label">Taken out by</span> <span id="mm-lostto">—</span></p>
+    <button id="mm-again" class="mm-btn mm-btn--play" type="button">Play again</button>
+    <a class="mm-back" href="../">Back to MAEDODEAM</a>
+  </section>
+
+  <p id="mm-live" class="vh" aria-live="polite"></p>
+</div>
+</body>
+</html>

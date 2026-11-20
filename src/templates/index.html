@@ -23,6 +23,12 @@
         <span class="line">{{t.hero.l3}}<span class="dot">.</span></span>
       </h1>
 
+      <div class="hero-side">
+      <p class="hero-play">
+        <a class="btn arrow hero-play-btn" href="{{page.play}}">{{t.hero.play_cta}}</a>
+        <span class="hero-play-note mono">{{t.hero.play_note}}</span>
+      </p>
+
       <a class="bench ticks" href="#escritorio-17h58">
         {{img.bench}}
         <span>
@@ -33,6 +39,7 @@
           </span>
         </span>
       </a>
+      </div>
 
       <ul class="hero-index">
         <li><span class="mono">01</span><strong>{{t.hero.i1}}.</strong><span>{{t.hero.i1d}}</span></li>
@@ -233,6 +240,22 @@
     </div>
   </section>
 
+  <!-- Fliperama: Microgame Mayhem -->
+  <section class="arcade" aria-labelledby="arcade-title">
+    <div class="arcade-marquee" aria-hidden="true"><span>{{t.play.cta_verbs}}{{t.play.cta_verbs}}</span><span>{{t.play.cta_verbs}}{{t.play.cta_verbs}}</span></div>
+    <div class="wrap arcade-inner">
+      <div class="arcade-copy">
+        <p class="label">{{t.play.cta_label}}</p>
+        <h2 class="arcade-title" id="arcade-title">{{t.play.cta_title}}</h2>
+        <p class="arcade-text">{{t.play.cta_text}}</p>
+      </div>
+      <div class="arcade-actions">
+        <a class="btn btn--big arcade-btn arrow" href="{{page.play}}">{{t.play.cta_button}}</a>
+        <p class="arcade-meta mono">{{t.play.cta_meta}}</p>
+      </div>
+    </div>
+  </section>
+
   <!-- 03 · Sobre -->
   <section class="section" id="about" aria-labelledby="about-title">
     <div class="wrap">
@@ -278,10 +301,10 @@
       <div class="contact-grid">
         <p class="contact-text">{{t.contact.text}}</p>
         <div class="contact-actions">
-          <a class="btn btn--primary btn--big arrow" href="mailto:maedodeam@gmail.com?subject={{page.mail_subject}}">{{t.contact.cta}}</a>
+          <a class="btn btn--primary btn--big arrow" href="mailto:{{site.email}}?subject={{page.mail_subject}}">{{t.contact.cta}}</a>
           <div class="email-row">
-            <a href="mailto:maedodeam@gmail.com">maedodeam@gmail.com</a>
-            <button class="copy" type="button" data-copy="maedodeam@gmail.com" data-done="{{t.contact.copied|e}}" hidden>{{t.contact.copy}}</button>
+            <a href="mailto:{{site.email}}">{{site.email}}</a>
+            <button class="copy" type="button" data-copy="{{site.email}}" data-done="{{t.contact.copied|e}}" hidden>{{t.contact.copy}}</button>
           </div>
           <p class="contact-note label">{{t.contact.note}}</p>
         </div>

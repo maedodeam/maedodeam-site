@@ -1,0 +1,38 @@
+# Locução do "SPEED UP" — gravações originais
+
+O jogo tem um locutor de monstro que anuncia cada aumento de velocidade, sobre um corte dramático da música.
+
+**Sem gravações aqui, o jogo usa rugidos sintetizados sem palavras** (a palavra "SPEED UP!" aparece na tela).
+A síntese de fala por código foi testada com reconhecimento de fala offline e não ficou inteligível o bastante para
+dizer palavras, então as falas só existem como gravações reais.
+
+## Como gravar
+
+Grave cada fala gritando, com energia de locutor de fliperama dos anos 90 (pode ser no celular). Exagere:
+gagueje na primeira sílaba e prolongue a vogal.
+
+| arquivo           | fala                |
+| ----------------- | ------------------- |
+| `faster`          | "F-F-F-FASTER!"     |
+| `speedup`         | "SPEED UUUUP!"      |
+| `gogogo`          | "GO! GO! GOOOO!"    |
+| `mayhem`          | "M-M-M-MAYHEM!"     |
+| `nobrakes`        | "NO BRAAAKES!"      |
+| `turbo`           | "T-T-TURBOOO!"      |
+
+Outras falas também valem: qualquer nome de arquivo em minúsculas (`hyper.raw.mp3`, por exemplo) entra na rotação.
+
+Duas opções de arquivo (`.mp3`, `.ogg`, `.wav` ou `.m4a`):
+
+- **`<fala>.raw.mp3`** — a sua voz crua. O jogo aplica a voz de monstro sozinho: camadas mais graves, saturação,
+  compressão forte, eco e reverb.
+- **`<fala>.mp3`** — já processada do jeito que você quiser; o jogo toca como está.
+
+Regras práticas:
+
+- Até **1,3 s** de fala por arquivo (o resto da tela de aceleração é a virada da bateria). Corte o silêncio do começo.
+- Mono, 44,1 kHz, ~96–128 kbps em MP3 basta (cada arquivo fica com ~15–25 KB).
+- Havendo pelo menos uma gravação, **só as gravações tocam** (os rugidos sintetizados saem da rotação).
+
+Depois de colocar os arquivos aqui, rode `npm run build` — eles vão embutidos no `assets/play/game.js`
+(nada é baixado durante o jogo).

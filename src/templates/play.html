@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="{{page.lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{page.title|e}}</title>
+<meta name="description" content="{{page.description|e}}">
+<meta name="theme-color" content="#0d0d0b">
+<meta name="color-scheme" content="dark">
+{{page.seo}}
+<link rel="icon" href="{{page.root}}favicon.svg" type="image/svg+xml">
+<link rel="icon" href="{{page.root}}favicon.ico" sizes="48x48">
+<link rel="apple-touch-icon" href="{{page.root}}apple-touch-icon.png">
+<link rel="preload" href="{{page.root}}assets/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="{{page.root}}assets/fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{{page.root}}assets/site.css?v={{site.version}}">
+<link rel="stylesheet" href="{{page.root}}assets/play/play.css?v={{site.play_version}}">
+<script src="{{page.root}}assets/play/game.js?v={{site.play_version}}" defer></script>
+</head>
+<body class="mm-page">
+<div id="mm" class="mm" data-screen="title" data-phase="title">
+  <div class="mm-stage" id="mm-stage">
+    <canvas id="mm-canvas" class="mm-canvas" tabindex="-1" role="img" aria-label="{{t.play.canvas_label|e}}"></canvas>
+  </div>
+
+  <div class="mm-bar">
+    <button id="mm-pause" class="mm-icon" type="button" aria-label="{{t.play.pause|e}}" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+    </button>
+    <button id="mm-sound" class="mm-icon" type="button" aria-label="{{t.play.sound|e}}" aria-pressed="true" data-on="true">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="mm-wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke-width="2"/><path class="mm-mute" d="M16 9l6 6M22 9l-6 6" fill="none" stroke-width="2"/></svg>
+    </button>
+    <button id="mm-full" class="mm-icon" type="button" aria-label="{{t.play.fullscreen|e}}" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke-width="2.2"/></svg>
+    </button>
+  </div>
+
+  <section id="mm-title" class="mm-screen mm-title" aria-labelledby="mm-logo">
+    <a class="mm-back" href="{{page.home}}">{{t.play.back}}</a>
+    <div class="mm-hero">
+      <p class="mm-kicker">{{t.play.kicker}}</p>
+      <h1 class="mm-logo" id="mm-logo"><span>{{t.play.logo1}}</span> <span>{{t.play.logo2}}<i>!</i></span></h1>
+      <button id="mm-play" class="mm-btn mm-btn--play" type="button" disabled>{{t.play.loading}}</button>
+      <p class="mm-controls" id="mm-controls">{{t.play.controls}}</p>
+    </div>
+    <div class="mm-foot">
+      <p class="mm-note">{{t.play.note}}</p>
+      {{page.lang_switch}}
+    </div>
+    <noscript><p class="mm-noscript">{{t.play.noscript}}</p></noscript>
+  </section>
+
+  <section id="mm-paused" class="mm-screen mm-card" aria-labelledby="mm-paused-h" hidden>
+    <h2 id="mm-paused-h" class="mm-h">{{t.play.paused}}</h2>
+    <button id="mm-resume" class="mm-btn mm-btn--play" type="button">{{t.play.resume}}</button>
+    <button id="mm-quit" class="mm-btn mm-btn--ghost" type="button">{{t.play.quit}}</button>
+    <a class="mm-back" href="{{page.home}}">{{t.play.back}}</a>
+  </section>
+
+  <section id="mm-over" class="mm-screen mm-card" aria-labelledby="mm-over-h" hidden>
+    <h2 id="mm-over-h" class="mm-h">{{t.play.gameover}}</h2>
+    <p class="mm-score"><span class="mm-label">{{t.play.score}}</span> <strong id="mm-score">0</strong></p>
+    <p class="mm-newbest" id="mm-newbest" hidden>{{t.play.newbest}}</p>
+    <dl class="mm-stats">
+      <div><dt>{{t.play.cleared}}</dt><dd id="mm-cleared">0</dd></div>
+      <div><dt>{{t.play.played}}</dt><dd id="mm-played">0</dd></div>
+      <div><dt>{{t.play.best}}</dt><dd id="mm-best">0</dd></div>
+    </dl>
+    <p class="mm-lostto"><span class="mm-label">{{t.play.lostto}}</span> <span id="mm-lostto">—</span></p>
+    <button id="mm-again" class="mm-btn mm-btn--play" type="button">{{t.play.again}}</button>
+    <a class="mm-back" href="{{page.home}}">{{t.play.back}}</a>
+  </section>
+
+  <p id="mm-live" class="vh" aria-live="polite"></p>
+</div>
+</body>
+</html>

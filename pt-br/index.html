@@ -30,8 +30,8 @@
 <link rel="icon" href="../favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <link rel="preload" href="../assets/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../assets/site.css?v=58987b5c">
-<script src="../assets/site.js?v=58987b5c" defer></script>
+<link rel="stylesheet" href="../assets/site.css?v=13e8bdb9">
+<script src="../assets/site.js?v=13e8bdb9" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://maedodeam.com.br/#org", "name": "MAEDODEAM", "legalName": "MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA", "url": "https://maedodeam.com.br/", "logo": "https://maedodeam.com.br/apple-touch-icon.png", "email": "maedodeam@gmail.com", "description": "Empresa independente de tecnologia que constrói software, produtos, jogos e experimentos.", "founder": {"@type": "Person", "name": "Roger Maedo", "jobTitle": "Fundador"}}, {"@type": "WebSite", "@id": "https://maedodeam.com.br/#website", "url": "https://maedodeam.com.br/pt-br/", "name": "MAEDODEAM", "inLanguage": "pt-BR", "publisher": {"@id": "https://maedodeam.com.br/#org"}}]}</script>
 </head>
 <body>
@@ -44,6 +44,7 @@
         <li><a href="#work">Projetos</a></li>
         <li><a href="#now">Agora</a></li>
         <li><a href="#about">Sobre</a></li>
+        <li class="nav-play-item"><a class="nav-play" href="play/">Jogar</a></li>
         <li class="nav-cta-item"><a class="nav-cta" href="#contact">Contato</a></li>
       </ul>
     </nav>
@@ -67,6 +68,12 @@
         <span class="line">coisas<span class="dot">.</span></span>
       </h1>
 
+      <div class="hero-side">
+      <p class="hero-play">
+        <a class="btn arrow hero-play-btn" href="play/">Jogar algo rápido</a>
+        <span class="hero-play-note mono">100 microgames · Sem instalar</span>
+      </p>
+
       <a class="bench ticks" href="#escritorio-17h58">
         <picture><source type="image/avif" srcset="../assets/img/e1758-desk-pt-br-640.avif 640w, ../assets/img/e1758-desk-pt-br-960.avif 960w, ../assets/img/e1758-desk-pt-br-1440.avif 1440w, ../assets/img/e1758-desk-pt-br-1920.avif 1920w" sizes="(min-width: 64rem) 28rem, 7.5rem"><img src="../assets/img/e1758-desk-pt-br-1440.webp" srcset="../assets/img/e1758-desk-pt-br-640.webp 640w, ../assets/img/e1758-desk-pt-br-960.webp 960w, ../assets/img/e1758-desk-pt-br-1440.webp 1440w, ../assets/img/e1758-desk-pt-br-1920.webp 1920w" sizes="(min-width: 64rem) 28rem, 7.5rem" width="1920" height="1080" alt="Captura de tela do Escritório 17h58" loading="eager" decoding="async"></picture>
         <span>
@@ -77,6 +84,7 @@
           </span>
         </span>
       </a>
+      </div>
 
       <ul class="hero-index">
         <li><span class="mono">01</span><strong>Software.</strong><span>Sistemas que aguentam produção.</span></li>
@@ -104,7 +112,7 @@
   <section class="manifesto" aria-labelledby="manifesto-title">
     <div class="wrap manifesto-inner">
       <h2 class="manifesto-title" id="manifesto-title" data-reveal>Ideia qualquer um tem. <span>Produto funcionando, não.</span></h2>
-      <p class="manifesto-text" data-reveal style="--d: 1">A gente não vende horas. A gente projeta, constrói e lança coisas que funcionam — nossos próprios produtos primeiro e, quando faz sentido, algo com o parceiro certo.</p>
+      <p class="manifesto-text" data-reveal style="--d: 1">A gente projeta, constrói e lança coisas que funcionam.</p>
       <ol class="loop" data-reveal style="--d: 2">
         <li><span class="mono">01 /</span><strong>Construir</strong><span>Fazer a coisa.</span></li>
         <li><span class="mono">02 /</span><strong>Testar</strong><span>Quebrar de propósito.</span></li>
@@ -277,6 +285,22 @@
     </div>
   </section>
 
+  <!-- Fliperama: Microgame Mayhem -->
+  <section class="arcade" aria-labelledby="arcade-title">
+    <div class="arcade-marquee" aria-hidden="true"><span>ESMAGA! · DESVIA! · ENCHE! · FATIA! · PULA! · REPETE! · ARQUIVA! · RESOLVE! · SEGURA! · NÃO ENCOSTA! · ESMAGA! · DESVIA! · ENCHE! · FATIA! · PULA! · REPETE! · ARQUIVA! · RESOLVE! · SEGURA! · NÃO ENCOSTA! · </span><span>ESMAGA! · DESVIA! · ENCHE! · FATIA! · PULA! · REPETE! · ARQUIVA! · RESOLVE! · SEGURA! · NÃO ENCOSTA! · ESMAGA! · DESVIA! · ENCHE! · FATIA! · PULA! · REPETE! · ARQUIVA! · RESOLVE! · SEGURA! · NÃO ENCOSTA! · </span></div>
+    <div class="wrap arcade-inner">
+      <div class="arcade-copy">
+        <p class="label">Pausa pro café</p>
+        <h2 class="arcade-title" id="arcade-title">Microgame Mayhem</h2>
+        <p class="arcade-text">100 joguinhos feitos aqui dentro. Quatro vidas, nada salvo, e cada jogo dura mais ou menos o tempo da sua atenção. Funciona com mouse, teclado ou toque.</p>
+      </div>
+      <div class="arcade-actions">
+        <a class="btn btn--big arcade-btn arrow" href="play/">Jogar agora</a>
+        <p class="arcade-meta mono">Jogo no navegador · Computador e celular · Sem cadastro</p>
+      </div>
+    </div>
+  </section>
+
   <!-- 03 · Sobre -->
   <section class="section" id="about" aria-labelledby="about-title">
     <div class="wrap">
@@ -366,6 +390,7 @@
         <ul>
           <li><a href="#escritorio-17h58">Escritório 17h58</a></li>
           <li><a href="#cotaria">Cotaria</a></li>
+          <li><a href="play/">Microgame Mayhem</a></li>
         </ul>
       </nav>
     </div>

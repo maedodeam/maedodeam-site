@@ -1,0 +1,253 @@
+/* Microgame Mayhem — página /play. Usa as fontes e os tokens de site.css; o jogo em si é desenhado no canvas. */
+
+html:has(.mm-page) { height: 100%; overflow: hidden; }
+.mm-page {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--bg);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mm { position: fixed; inset: 0; background: var(--bg); }
+
+/* Área útil, respeitando o notch e as barras do sistema. */
+.mm-stage {
+  position: absolute;
+  top: env(safe-area-inset-top, 0px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
+  left: env(safe-area-inset-left, 0px);
+}
+.mm-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+  cursor: default;
+}
+.mm[data-screen="game"] .mm-canvas { cursor: crosshair; }
+
+/* ---------- botões do topo ---------- */
+
+.mm-bar {
+  position: absolute;
+  z-index: 5;
+  top: calc(env(safe-area-inset-top, 0px) + (var(--mm-top, 56px) - 40px) / 2);
+  right: calc(env(safe-area-inset-right, 0px) + 10px);
+  display: flex;
+  gap: 8px;
+}
+.mm-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 2px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--ink, #0d0d0b);
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--text);
+  cursor: pointer;
+}
+.mm-icon svg { width: 22px; height: 22px; fill: currentColor; stroke: currentColor; }
+.mm-icon:hover { border-color: var(--text); }
+.mm-icon[hidden] { display: none; }
+.mm-icon .mm-mute { display: none; }
+.mm-icon[data-on="false"] .mm-mute { display: inline; }
+.mm-icon[data-on="false"] .mm-wave { display: none; }
+.mm-icon[data-on="false"] { color: var(--faint); }
+
+/* ---------- telas ---------- */
+
+.mm-screen {
+  position: absolute;
+  z-index: 4;
+  top: env(safe-area-inset-top, 0px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
+  left: env(safe-area-inset-left, 0px);
+  -webkit-user-select: text;
+  user-select: text;
+}
+.mm-screen[hidden] { display: none; }
+
+.mm-back {
+  display: inline-flex;
+  align-items: center;
+  gap: .6rem;
+  font-family: var(--mono);
+  font-size: .8125rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  padding: .5rem 0;
+}
+.mm-back::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  background: currentColor;
+  -webkit-mask: var(--arrow) center / contain no-repeat;
+  mask: var(--arrow) center / contain no-repeat;
+  transform: rotate(180deg);
+}
+.mm-back:hover { color: var(--text); }
+
+/* Tela inicial */
+.mm-title {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 14px clamp(16px, 4vw, 40px) 18px;
+  background: radial-gradient(ellipse at 50% 55%, color-mix(in srgb, var(--bg) 35%, transparent), color-mix(in srgb, var(--bg) 80%, transparent) 70%);
+}
+.mm-title .mm-back { justify-self: start; }
+.mm-hero {
+  align-self: center;
+  justify-self: center;
+  display: grid;
+  justify-items: center;
+  gap: clamp(.9rem, 2.4vh, 1.6rem);
+  text-align: center;
+  max-width: 40rem;
+}
+.mm-kicker {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: .8125rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mm-logo {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 62%;
+  text-transform: uppercase;
+  line-height: .82;
+  font-size: clamp(4rem, min(19vw, 17vh), 11rem);
+  letter-spacing: -.01em;
+  color: var(--text);
+  -webkit-text-stroke: 0;
+  text-shadow: .045em .055em 0 var(--accent);
+}
+.mm-logo span { display: block; }
+.mm-logo span:last-child { color: var(--accent); text-shadow: .045em .055em 0 var(--text); transform: rotate(-3deg); }
+.mm-logo i { font-style: normal; }
+.mm-controls { margin: 0; color: var(--muted); font-size: .9375rem; }
+.mm-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem 1.5rem;
+}
+.mm-note { margin: 0; color: var(--faint); font-family: var(--mono); font-size: .75rem; letter-spacing: .04em; }
+.mm-noscript { text-align: center; color: var(--accent); }
+
+/* Botões grandes de fliperama */
+.mm-btn {
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 70%;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  line-height: 1;
+  padding: .45em 1.6em .5em;
+  border: 4px solid var(--bg);
+  border-radius: 18px;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.mm-btn--play {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 0 0 3px var(--text), 7px 8px 0 3px var(--text);
+}
+.mm-btn--play:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: 0 0 0 3px var(--text), 9px 10px 0 3px var(--text); }
+.mm-btn--play:active:not(:disabled) { transform: translate(4px, 5px); box-shadow: 0 0 0 3px var(--text), 2px 2px 0 3px var(--text); }
+.mm-btn:disabled { opacity: .6; cursor: progress; }
+.mm-btn--ghost {
+  font-size: 1rem;
+  font-family: var(--sans);
+  font-stretch: 100%;
+  font-weight: 600;
+  text-transform: none;
+  padding: .8em 1.4em;
+  background: transparent;
+  color: var(--text);
+  border: 2px solid var(--line-2);
+}
+.mm-btn--ghost:hover { border-color: var(--text); }
+@media (prefers-reduced-motion: reduce) {
+  .mm-btn { transition: none; }
+}
+
+/* Cartões de pausa e fim de jogo */
+.mm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+}
+.mm-h {
+  margin: 0 0 .5rem;
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 62%;
+  text-transform: uppercase;
+  font-size: clamp(3rem, 12vw, 6.5rem);
+  line-height: .85;
+  color: var(--text);
+}
+#mm-over .mm-h { color: var(--accent); }
+.mm-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: .75rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mm-score { margin: 0; }
+.mm-score strong {
+  display: block;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: clamp(2.5rem, 9vw, 4rem);
+  line-height: 1.1;
+  color: var(--text);
+}
+.mm-newbest {
+  margin: 0;
+  padding: .3rem .8rem;
+  border-radius: 999px;
+  background: var(--yellow, #ffc83d);
+  color: var(--bg);
+  font-weight: 800;
+}
+.mm-newbest[hidden] { display: none; }
+.mm-stats { display: flex; gap: clamp(1rem, 5vw, 2.5rem); margin: .25rem 0; }
+.mm-stats div { display: grid; gap: .2rem; }
+.mm-stats dt { font-family: var(--mono); font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.mm-stats dd { margin: 0; font-family: var(--mono); font-size: 1.5rem; font-weight: 700; }
+.mm-lostto { margin: 0 0 .5rem; color: var(--text); font-weight: 700; font-size: 1.125rem; }
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .mm-logo { font-size: clamp(3rem, 15vh, 6rem); }
+  .mm-hero { gap: .6rem; }
+  .mm-card { gap: .5rem; }
+  .mm-h { font-size: 3rem; }
+}

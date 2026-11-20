@@ -13,6 +13,18 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://maedodeam.com.br/"/>
   </url>
   <url>
+    <loc>https://maedodeam.com.br/play/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://maedodeam.com.br/play/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://maedodeam.com.br/pt-br/play/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://maedodeam.com.br/play/"/>
+  </url>
+  <url>
+    <loc>https://maedodeam.com.br/pt-br/play/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://maedodeam.com.br/play/"/>
+    <xhtml:link rel="alternate" hreflang="pt-BR" href="https://maedodeam.com.br/pt-br/play/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://maedodeam.com.br/play/"/>
+  </url>
+  <url>
     <loc>https://maedodeam.com.br/support.html</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://maedodeam.com.br/support.html"/>
     <xhtml:link rel="alternate" hreflang="pt-BR" href="https://maedodeam.com.br/pt-br/support.html"/>
