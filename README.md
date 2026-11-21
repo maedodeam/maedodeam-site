@@ -88,7 +88,7 @@ Ao mudar a política:
 
 ## Jogo: Microgame Mayhem (`/play/`)
 
-Jogo de 100 microgames que roda no navegador, sem backend, sem rede depois do carregamento e sem guardar nada.
+Jogo de 300 microgames que roda no navegador, sem backend, sem rede depois do carregamento e sem guardar nada.
 O código fica em `game/` (TypeScript); a arquitetura, o contrato dos microgames e o processo de verificação
 estão em `game/README.md`, e o catálogo completo em `game/CATALOG.md`.
 

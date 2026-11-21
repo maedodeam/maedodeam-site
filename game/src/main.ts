@@ -4,7 +4,7 @@ import { AudioManager } from "./audio/audio.ts";
 import { DomInput } from "./core/dom-input.ts";
 import { tr, UI } from "./core/i18n.ts";
 import { fitStage, hudBands, type Fit } from "./core/layout.ts";
-import { Session, SPEEDUP_TIME } from "./core/session.ts";
+import { LIFE_POP_AT, Session, SPEEDUP_TIME } from "./core/session.ts";
 import type { Lang } from "./core/types.ts";
 import { CATALOG } from "./games/index.ts";
 import { Renderer, type View } from "./ui/render.ts";
@@ -86,6 +86,7 @@ const session = new Session({
         audio.gameStart();
         break;
       case "game":
+        if (e.def.wtf) audio.wtfStart(e.def.wtf === "insane");
         if (live) live.textContent = `${tr(e.def.verb, lang)} — ${tr(e.def.name, lang)}`;
         break;
       case "result":
@@ -97,7 +98,8 @@ const session = new Session({
         break;
       case "speedup":
         audio.speedup(e.tier, SPEEDUP_TIME);
-        if (live) live.textContent = tr(UI.speedUp, lang);
+        if (e.life) audio.lifeUp(LIFE_POP_AT);
+        if (live) live.textContent = tr(UI.speedUp, lang) + (e.life ? ` ${tr(UI.lifeUp, lang)}` : "");
         break;
       case "over":
         showOver();

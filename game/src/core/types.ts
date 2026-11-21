@@ -59,6 +59,12 @@ export interface MicrogameDef {
   timeScale?: number;
   /** Duração mínima em segundos, mesmo nas velocidades altas. Padrão 2.6. */
   minTime?: number;
+  /**
+   * WTF Moment: desafio absurdo que quebra a expectativa (mas tem lógica e dá para vencer).
+   * O sequenciador os sorteia à parte: o primeiro entre a 8ª e a 12ª fase, depois um a cada ~8–12.
+   * "insane" = ainda mais absurdo e psicodélico; só sai depois da 30ª fase.
+   */
+  wtf?: "normal" | "insane";
   /** Cor de fundo do palco. */
   bg: string;
   setup(api: MicroAPI): MicroInstance;
@@ -178,7 +184,15 @@ export type SfxName =
   | "rise"
   | "thud"
   | "zap"
-  | "chime";
+  | "chime"
+  // sons próprios dos WTF Moments
+  | "warp"
+  | "glitch"
+  | "boing"
+  | "kazoo"
+  | "choir"
+  | "wobble"
+  | "tada";
 
 export interface FxApi {
   /** Explosão de partículas (confete) em x,y. */

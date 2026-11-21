@@ -5,7 +5,7 @@ import { BARS_PER_LOOP, bpmForTier, keyShiftForTier, MELODY, PROGRESSION, STEPS_
 import { layersFor, stepEvents, surpriseFor, type Arrangement } from "../src/audio/composer.ts";
 import { nextGridTime, speedupPlan } from "../src/audio/music.ts";
 import { ANNOUNCEMENTS, LINES, PHONES, SYLLABLES, segsDuration } from "../src/audio/voice.ts";
-import { SPEEDUP_TIME } from "../src/core/session.ts";
+import { LIFE_POP_AT, SPEEDUP_TIME } from "../src/core/session.ts";
 
 const game = (tier: number): Arrangement => ({ mode: "game", tier, keyShift: keyShiftForTier(tier) });
 const LOOP = STEPS_PER_BAR * BARS_PER_LOOP;
@@ -116,6 +116,10 @@ describe("sincronia", () => {
       // a voz mais longa termina antes da virada
       const longest = Math.max(...Object.values(ANNOUNCEMENTS).map((a) => segsDuration(a.segs)));
       assert.ok(p.voice + longest <= p.fillStart + 0.05, `nível ${tier}: voz ${longest.toFixed(2)} s não cabe`);
+      // +1 vida: o arpejo entra depois do grito mais longo (com o maior atraso de corte) e termina antes da volta
+      const worstVoiceEnd = 0.12 + 0.06 + longest;
+      assert.ok(LIFE_POP_AT >= worstVoiceEnd - 1e-9, `vida em ${LIFE_POP_AT}s cobre o grito (acaba em ${worstVoiceEnd.toFixed(2)}s)`);
+      assert.ok(now + LIFE_POP_AT + 0.9 <= p.drop, `nível ${tier}: o arpejo da vida passa da volta`);
     }
   });
 });

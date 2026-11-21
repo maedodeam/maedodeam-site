@@ -1,7 +1,7 @@
 # Microgame Mayhem
 
 Jogo de microgames da MAEDODEAM, publicado em `/play/` (EN) e `/pt-br/play/` (PT-BR).
-Uma sequência rápida de desafios de poucos segundos, com 4 vidas e dificuldade crescente.
+Uma sequência rápida de 300 desafios de poucos segundos, com 4 vidas (+1 a cada 10 fases, até 4) e dificuldade crescente.
 Roda inteiro no navegador, em computador, tablet e celular. **Nada é salvo e nada é enviado:**
 sem backend, cookies, storage, analytics ou rede depois do carregamento.
 
@@ -16,14 +16,14 @@ game/
 │   │   ├── session.ts       máquina de estados da partida (vidas, pontos, fases)
 │   │   ├── runner.ts        executa um microgame: instrução, tempo, vitória/derrota
 │   │   ├── difficulty.ts    curva de duração, nível, pontos
-│   │   ├── sequencer.ts     escolha do próximo microgame (baralho, sem repetições próximas)
+│   │   ├── sequencer.ts     escolha do próximo microgame (baralho, WTF Moments, sem repetições próximas)
 │   │   ├── input.ts         entrada unificada (mouse, toque, teclado) — pura
 │   │   ├── dom-input.ts     liga os eventos do navegador ao input.ts
 │   │   ├── layout.ts        encaixe responsivo do palco
 │   │   ├── rng.ts           aleatório com semente
 │   │   └── i18n.ts          textos da interface e dicas de controle
 │   ├── audio/audio.ts       Web Audio: efeitos, vinhetas e música sintetizados
-│   ├── gfx/                 draw.ts (Gfx), palette.ts, art.ts (elenco), fx.ts (partículas)
+│   ├── gfx/                 draw.ts (Gfx), palette.ts, art.ts (elenco), fx.ts (partículas), wtf.ts (psicodelia)
 │   ├── kit/                 choices.ts, drag.ts, mover.ts (componentes reutilizáveis)
 │   ├── ui/render.ts         HUD, interlúdio, instrução, resultado, aceleração, fim
 │   ├── testing/             sim.ts (simulação com bots), botkit.ts (ajudantes de bot)
@@ -37,6 +37,24 @@ game/
 O build (`npm run build:game`) gera `assets/play/game.js`, um único arquivo minificado que vai para o
 repositório, como o resto do site estático. A página é gerada por `src/build.py` a partir de
 `src/templates/play.html`.
+
+## Partida: sorteio, WTF Moments e vidas
+
+- **Baralho.** Os microgames normais saem todos uma vez antes de repetir. As 10 primeiras fases são fáceis, até a 19ª
+  médias e, a partir da 20ª, entram as difíceis (nunca duas seguidas). Nada se repete dentro de 6 fases, e o
+  sorteio evita repetir categoria ou gesto em seguida.
+- **WTF Moments** (`def.wtf`): desafios absurdos e inesperados, mas com lógica e possíveis de vencer de primeira.
+  Ficam fora do baralho e saem **sem aviso**: o primeiro entre a 8ª e a 12ª fase; depois, um a cada 8–12 fases, com o
+  intervalo encurtando um pouco depois da 30ª e da 60ª. Nunca saem dois seguidos e não se repetem numa partida
+  enquanto houver outros. Os `"insane"` (mais psicodélicos) só saem depois da 30ª fase, com preferência. Cada um tem
+  visual (`gfx/wtf.ts`) e sons próprios (`warp`, `glitch`, `boing`, `kazoo`, `choir`, `wobble`, `tada`); a instrução
+  entra "derretendo" em cores e há um "derretimento" sonoro ao começar.
+- **Vidas.** Começa com 4. A cada 10 microgames concluídos (vencidos ou perdidos), quem ainda está vivo passa pelo
+  "SPEED UP!" e, se tiver menos de 4, ganha +1 vida: o coração surge com brilho e "+1 LIFE!" depois do grito, com um
+  arpejo agudo. Com 4 vidas só aparece o "SPEED UP!". Cada marco dá vida no máximo uma vez, nunca depois do fim de
+  jogo, e a transição continua com a mesma duração (não tira tempo do microgame seguinte).
+- **Curva.** Nível interno e duração seguem a mesma curva de antes: o "ciclo" continua sendo de 100 fases
+  (`CYCLE_LENGTH`), mesmo com 300 no catálogo.
 
 ## Música e som
 
@@ -112,7 +130,8 @@ export const meuJogo: Entry<S> = {
 };
 ```
 
-Depois, acrescente o `Entry` à lista do `index.ts` do lote.
+Depois, acrescente o `Entry` à lista do `index.ts` do lote. Para um WTF Moment, acrescente `wtf: "normal"` (ou
+`"insane"`, que só sai depois da 30ª fase) e use `gfx/wtf.ts` e os sons de WTF.
 
 ### Regras do contrato
 

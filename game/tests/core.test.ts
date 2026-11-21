@@ -3,8 +3,8 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { InputCore, SWIPE_MIN } from "../src/core/input.ts";
 import { durationFor, levelFor, pointsFor, scheduleSeconds, START_LIVES, tierOf, SPEEDUP_EVERY } from "../src/core/difficulty.ts";
-import { Sequencer } from "../src/core/sequencer.ts";
-import { Session, betweenTime, SPEEDUP_TIME, OVER_TIME } from "../src/core/session.ts";
+import { Sequencer, WTF_INSANE_FROM } from "../src/core/sequencer.ts";
+import { Session, betweenTime, SPEEDUP_TIME, OVER_TIME, LIFE_POP_AT } from "../src/core/session.ts";
 import { fitStage, hudBands, STAGE_LONG_MAX, STAGE_SHORT } from "../src/core/layout.ts";
 import { MicroRunner, INTRO_FREEZE, AFTERMATH } from "../src/core/runner.ts";
 import { Rng } from "../src/core/rng.ts";
@@ -280,6 +280,85 @@ describe("sequenciador", () => {
   });
 });
 
+// ================= WTF Moments =================
+
+describe("WTF Moments no sorteio", () => {
+  // como o catálogo real: 268 normais + 32 WTF (21 normais, 11 "insane")
+  const normal = Array.from({ length: 268 }, (_, i) => fakeDef(i + 1, { difficulty: i < 10 ? 3 : i < 90 ? 1 : 2 }));
+  const wtf = Array.from({ length: 32 }, (_, i) => fakeDef(1000 + i, { wtf: i < 21 ? "normal" : "insane", difficulty: 1 }));
+  const cat = [...normal, ...wtf];
+  const run = (seed: number, len: number) => {
+    const seq = new Sequencer(cat, new Rng(seed));
+    return Array.from({ length: len }, (_, n) => seq.next(n));
+  };
+
+  test("o primeiro sai entre a 8ª e a 12ª fase; depois, um a cada 8–12; nunca dois seguidos", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      const pos = run(seed, 300).flatMap((d, n) => (d.wtf ? [n + 1] : []));
+      assert.ok(pos[0] >= 8 && pos[0] <= 12, `seed ${seed}: primeiro WTF na fase ${pos[0]}`);
+      for (let i = 1; i < pos.length; i++) {
+        const gap = pos[i] - pos[i - 1];
+        assert.ok(gap >= 8 && gap <= 12, `seed ${seed}: intervalo ${gap} entre ${pos[i - 1]} e ${pos[i]}`);
+      }
+    }
+  });
+
+  test("os mais absurdos (insane) só depois da 30ª fase, e aparecem depois dela", () => {
+    let insaneSeen = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      run(seed, 120).forEach((d, n) => {
+        if (d.wtf === "insane") {
+          assert.ok(n >= WTF_INSANE_FROM, `seed ${seed}: insane na fase ${n + 1}`);
+          insaneSeen++;
+        }
+      });
+    }
+    assert.ok(insaneSeen > 200 * 3, `poucos insane depois da 30ª: ${insaneSeen}`);
+  });
+
+  test("a frequência sobe um pouco conforme a partida avança", () => {
+    const early: number[] = [];
+    const late: number[] = [];
+    for (let seed = 1; seed <= 300; seed++) {
+      const pos = run(seed, 200).flatMap((d, n) => (d.wtf ? [n] : []));
+      for (let i = 1; i < pos.length; i++) {
+        if (pos[i - 1] < WTF_INSANE_FROM) early.push(pos[i] - pos[i - 1]);
+        else if (pos[i - 1] >= 60) late.push(pos[i] - pos[i - 1]);
+      }
+    }
+    const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+    assert.ok(avg(late) < avg(early), `intervalo médio: começo ${avg(early).toFixed(2)}, depois da 60ª ${avg(late).toFixed(2)}`);
+  });
+
+  test("não repete o mesmo WTF numa partida enquanto houver outros disponíveis", () => {
+    for (let seed = 1; seed <= 100; seed++) {
+      const ids = run(seed, 320).filter((d) => d.wtf).map((d) => d.id);
+      // ~33 WTF numa partida de 320 fases, com 32 disponíveis: só pode repetir depois de usar todos
+      const firstRepeat = ids.findIndex((id, i) => ids.indexOf(id) < i);
+      if (firstRepeat >= 0) assert.ok(new Set(ids.slice(0, firstRepeat)).size === wtf.length, `seed ${seed}: repetiu antes de usar todos`);
+    }
+  });
+
+  test("os WTF ficam fora do baralho: os normais continuam saindo todos antes de repetir", () => {
+    const seq = new Sequencer(cat, new Rng(9));
+    const seen = new Set<string>();
+    let n = 0;
+    while (seen.size < normal.length && n < 400) {
+      const d = seq.next(n++);
+      if (!d.wtf) {
+        assert.ok(!seen.has(d.id), `repetiu ${d.id} antes de esgotar o baralho`);
+        seen.add(d.id);
+      }
+    }
+    assert.equal(seen.size, normal.length);
+  });
+
+  test("catálogo sem WTF: nenhum WTF sai", () => {
+    const a = new Sequencer(normal, new Rng(4));
+    assert.ok(Array.from({ length: 300 }, (_, n) => a.next(n)).every((d) => !d.wtf));
+  });
+});
+
 // ================= partida =================
 
 function runSession(opts: { behave?: "win" | "lose" | "alternate"; frames?: number; catalog?: MicrogameDef[] } = {}) {
@@ -365,6 +444,114 @@ describe("sessão (máquina de estados da partida)", () => {
     while (s.played < 45 && guard++ < 200000) step(1);
     assert.equal(s.played, 45);
     assert.ok(s.tier >= 5);
+  });
+
+  /** Partida em que o microgame número k (1, 2, 3…) é perdido se lose(k) for verdadeiro. */
+  function scripted(lose: (k: number) => boolean, seed: number) {
+    const inp = new InputCore();
+    const events: SessionEvent[] = [];
+    const s = new Session({ catalog: CATALOG_20, seed, lang: "en", input: inp, stage: () => ({ w: 1780, h: 1000 }), onEvent: (e) => events.push(e) });
+    const step = () => {
+      const r = s.runner;
+      if (r && r.phase === "play" && !r.result && !lose(s.played + 1)) inp.pointerDown(500, 500, "mouse");
+      inp.frame(1 / 60);
+      s.step(1 / 60);
+      inp.pointerUp(500, 500, "mouse");
+    };
+    return { s, events, step };
+  }
+
+  test("nos marcos 10, 20, 30, 40, 50: +1 vida junto com a transição, nunca acima de 4", () => {
+    // perde 2 nas primeiras dez, depois 1 por dezena
+    const lose = new Set([2, 5, 13, 24, 36, 47]);
+    const { s, events, step } = scripted((k) => lose.has(k), 3);
+    s.start();
+    const livesAt: Record<number, number> = {};
+    let maxLives = 0;
+    let guard = 0;
+    while (s.played < 51 && guard++ < 400000) {
+      step();
+      maxLives = Math.max(maxLives, s.lives);
+      if (s.phase === "speedup" && livesAt[s.played] === undefined) livesAt[s.played] = s.lives;
+    }
+    assert.ok(maxLives <= START_LIVES, `passou de ${START_LIVES} vidas: ${maxLives}`);
+    // 10: 4−2 = 2 → 3. 20: 3−1 → 3. 30: 3−1 → 3. 40: 3−1 → 3. 50: 3−1 → 3.
+    assert.deepEqual(livesAt, { 10: 3, 20: 3, 30: 3, 40: 3, 50: 3 });
+    const ups = events.filter((e) => e.type === "speedup");
+    assert.deepEqual(
+      ups.map((e) => e.type === "speedup" && e.life),
+      [true, true, true, true, true],
+    );
+  });
+
+  test("a vida vem mesmo se o 10º microgame foi perdido (desde que ainda haja vida)", () => {
+    const { s, step } = scripted((k) => k === 10, 4);
+    s.start();
+    let guard = 0;
+    while (s.phase !== "speedup" && guard++ < 200000) step();
+    assert.equal(s.played, 10);
+    assert.equal(s.lives, START_LIVES, "4 − 1 + 1");
+    assert.equal(s.lifeBonus, true);
+  });
+
+  test("com 4 vidas, a transição não dá vida nem mostra o bônus", () => {
+    const { s, step, events } = runSession({ behave: "win" });
+    s.start();
+    let guard = 0;
+    while (s.played < 10 && guard++ < 20000) step(1);
+    assert.equal(s.phase, "speedup");
+    assert.equal(s.lives, START_LIVES);
+    assert.equal(s.lifeBonus, false);
+    assert.ok(events.some((e) => e.type === "speedup" && !e.life));
+  });
+
+  test("perder a última vida justamente no 10º: fim de jogo, sem transição nem vida extra", () => {
+    const lose = new Set([1, 2, 3, 10]);
+    const { s, events, step } = scripted((k) => lose.has(k), 8);
+    s.start();
+    let guard = 0;
+    while (s.phase !== "over" && guard++ < 200000) step();
+    assert.equal(s.phase, "over");
+    assert.equal(s.played, 10);
+    assert.equal(s.lives, 0);
+    assert.ok(!events.some((e) => e.type === "speedup"), "não pode haver transição nem vida depois do fim");
+    for (let i = 0; i < 300; i++) s.step(1 / 60);
+    assert.equal(s.lives, 0);
+  });
+
+  test("o mesmo marco processado duas vezes só dá uma vida", () => {
+    const { s } = runSession();
+    s.start();
+    s.lives = 2;
+    const grant = (s as unknown as { grantMilestoneLife(p: number): boolean }).grantMilestoneLife.bind(s);
+    assert.equal(grant(10), true);
+    assert.equal(grant(10), false);
+    assert.equal(s.lives, 3);
+    assert.equal(grant(20), true);
+    assert.equal(s.lives, 4);
+    assert.equal(grant(30), false, "já está no máximo");
+    assert.equal(s.lives, 4);
+    s.lives = 0;
+    assert.equal(grant(40), false, "sem vida não recupera");
+  });
+
+  test("a vida extra não muda a duração da transição nem tira tempo do microgame seguinte", () => {
+    const { s, step } = scripted((k) => k === 1, 2);
+    s.start();
+    let guard = 0;
+    while (s.phase !== "speedup" && guard++ < 200000) step();
+    assert.equal(s.lifeBonus, true);
+    assert.ok(LIFE_POP_AT > 0 && LIFE_POP_AT < SPEEDUP_TIME);
+    let frames = 0;
+    while (s.phase === "speedup") {
+      s.step(1 / 60);
+      frames++;
+    }
+    assert.ok(Math.abs(frames / 60 - SPEEDUP_TIME) < 0.05, `transição durou ${frames / 60}s`);
+    while (s.phase !== "game") s.step(1 / 60);
+    const r = s.runner!;
+    assert.equal(r.time, 0, "o microgame seguinte começa do zero");
+    assert.equal(r.duration, durationFor(r.def, 10, 100));
   });
 
   test("erro dentro de um microgame não custa vida", () => {

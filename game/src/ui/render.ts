@@ -1,6 +1,6 @@
 // Desenho das telas do jogo em volta dos microgames: HUD, interlúdio, instrução, resultado, aceleração, fim.
 import type { Session } from "../core/session.ts";
-import { betweenTime, SPEEDUP_TIME } from "../core/session.ts";
+import { betweenTime, LIFE_POP_AT, SPEEDUP_TIME } from "../core/session.ts";
 import { INTRO_FREEZE } from "../core/runner.ts";
 import { START_LIVES } from "../core/difficulty.ts";
 import type { InputMode, Lang, Text } from "../core/types.ts";
@@ -8,6 +8,7 @@ import { hintText, tr, UI } from "../core/i18n.ts";
 import { Gfx } from "../gfx/draw.ts";
 import { C } from "../gfx/palette.ts";
 import { heart, blob } from "../gfx/art.ts";
+import { psyColor } from "../gfx/wtf.ts";
 import type { Fit } from "../core/layout.ts";
 import type { MicrogameDef } from "../core/types.ts";
 
@@ -99,10 +100,11 @@ export class Renderer {
     const s = st.session;
     const t = v.top;
     const hr = t * 0.22;
-    // vidas
+    // vidas (a vida extra da transição de velocidade só aparece quando o coração surge na tela)
+    const shown = s.lives - (s.phase === "speedup" && s.lifeBonus && s.phaseTime < LIFE_POP_AT ? 1 : 0);
     for (let i = 0; i < START_LIVES; i++) {
       const x = 16 + hr * 1.3 + i * hr * 2.8;
-      const alive = i < s.lives;
+      const alive = i < shown;
       heart(g, x, t / 2 + 2, hr, alive ? C.orange : C.ink2, { stroke: alive ? C.ink : C.gray2, lw: 2.5 });
     }
     // número do microgame
@@ -160,14 +162,25 @@ export class Renderer {
   private instruction(def: MicrogameDef, verbText: Text, st: RenderState, inK: number, alpha: number): void {
     const g = this.g;
     const verb = tr(verbText, st.lang);
-    const size = Math.min(g.w / Math.max(4, verb.length * 0.5), g.h * 0.24, 260);
+    let size = Math.min(g.w / Math.max(4, verb.length * 0.5), g.h * 0.24, 260);
+    // instruções longas (até 22 letras) sempre cabem na largura do palco
+    const tw = g.textWidth(verb, { size });
+    if (tw > g.w * 0.9) size *= (g.w * 0.9) / tw;
     g.push();
     g.alpha(alpha);
     g.translate(g.w / 2, g.h * 0.42);
     g.rotate(-0.06);
     g.scale(Math.max(0.01, inK));
-    g.text(verb, 10, 14, { size, color: C.ink, stroke: C.ink, lw: size * 0.22 });
-    g.text(verb, 0, 0, { size, color: C.paper, stroke: C.ink, lw: size * 0.2 });
+    if (def.wtf) {
+      // WTF Moment: a instrução também entra "derretendo" em cores (sem perder a leitura)
+      const sp = st.calm ? 0 : 1;
+      g.rotate(Math.sin(st.time * 9 * sp) * 0.05);
+      g.text(verb, 14, 18, { size, color: psyColor(st.time * sp, 180), stroke: C.ink, lw: size * 0.22 });
+      g.text(verb, 0, 0, { size, color: def.wtf === "insane" ? psyColor(st.time * sp, 0, 100, 78) : C.yellow, stroke: C.ink, lw: size * 0.2 });
+    } else {
+      g.text(verb, 10, 14, { size, color: C.ink, stroke: C.ink, lw: size * 0.22 });
+      g.text(verb, 0, 0, { size, color: C.paper, stroke: C.ink, lw: size * 0.2 });
+    }
     g.pop();
     const hint = hintText(def.hint, st.mode, st.lang);
     const hs = Math.min(46, g.w * 0.045);
@@ -284,6 +297,42 @@ export class Renderer {
     g.text(text, 0, 0, { size, color: C.yellow, stroke: C.ink, lw: size * 0.1 });
     g.pop();
     g.text(`×${s.tier}`, g.w / 2, g.h / 2 + size * 1.05, { size: size * 0.45, font: "mono", color: C.ink });
+    if (s.lifeBonus && t >= LIFE_POP_AT) this.lifeUp(st, t - LIFE_POP_AT, size, Math.max(0, out));
+  }
+
+  /** +1 vida na transição de velocidade: um coração surge com brilho e o texto "+1 LIFE!". */
+  private lifeUp(st: RenderState, k: number, size: number, alpha: number): void {
+    const g = this.g;
+    // cabe no espaço acima da faixa do "SPEED UP!"
+    const bandTop = g.h / 2 - size * 0.75;
+    const hr = Math.min(size * 0.32, g.w * 0.07, bandTop / 3.2);
+    const cy = bandTop / 2;
+    const pop = st.calm ? 1 : back(k / 0.3);
+    const text = tr(UI.lifeUp, st.lang);
+    const ts = hr * 1.15;
+    const tw = g.textWidth(text, { size: ts });
+    const total = hr * 2.4 + tw;
+    const hx = g.w / 2 - total / 2 + hr;
+    g.push();
+    g.alpha(alpha);
+    // faixa escura atrás, para destacar das listras
+    const padX = hr * 0.7;
+    g.rect(g.w / 2 - total / 2 - padX, cy - hr * 1.25, total + padX * 2, hr * 2.5, C.ink, { r: hr * 0.5, stroke: C.yellow, lw: 5 });
+    // brilho em volta do coração
+    if (!st.calm) {
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + k * 2;
+        const d = hr * (1.3 + Math.min(1, k * 3) * 0.6);
+        g.star(hx + Math.cos(a) * d, cy + Math.sin(a) * d, hr * 0.22 * (1 - Math.min(1, k)), hr * 0.08, 4, C.yellow, { stroke: null });
+      }
+    }
+    g.push();
+    g.translate(hx, cy);
+    g.scale(Math.max(0.01, pop));
+    heart(g, 0, 0, hr, C.red, { stroke: C.ink, lw: hr * 0.12 });
+    g.pop();
+    g.text(text, hx + hr * 1.4 + tw / 2, cy + ts * 0.05, { size: ts * Math.min(1, pop), color: C.yellow, stroke: C.ink, lw: ts * 0.14 });
+    g.pop();
   }
 
   // ---------------- fim ----------------

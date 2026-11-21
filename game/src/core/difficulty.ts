@@ -14,9 +14,13 @@ export function scheduleSeconds(n: number): number {
   return 3;
 }
 
-/** Ciclo do catálogo: 0 durante os primeiros 100 microgames, 1 nos 100 seguintes, etc. */
-export function cycleOf(n: number, catalogSize: number): number {
-  return Math.floor(n / Math.max(1, catalogSize));
+/**
+ * Ciclo da curva: 0 durante os primeiros 100 microgames, 1 nos 100 seguintes, etc.
+ * O ciclo continua sendo de 100 fases mesmo com o catálogo maior (300), para a curva de dificuldade não mudar.
+ */
+export const CYCLE_LENGTH = 100;
+export function cycleOf(n: number, _catalogSize = CYCLE_LENGTH): number {
+  return Math.floor(n / CYCLE_LENGTH);
 }
 
 /** Dificuldade interna passada ao microgame: sobe até 1 por volta do 60º e passa de 1 nos ciclos seguintes (máx. 1.5). */

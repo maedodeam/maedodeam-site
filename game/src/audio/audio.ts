@@ -266,7 +266,54 @@ export class AudioManager {
         this.tone(this.inKey(19, 5), 0.25, "sine", 0.18);
         this.tone(this.inKey(24, 5), 0.3, "sine", 0.13, 0.05);
         break;
+      // ---- WTF Moments ----
+      case "warp":
+        // espiral de tom descendo e subindo, como fita derretendo
+        this.tone(this.inKey(12, 5), 0.22, "sine", 0.18, 0, this.inKey(0, 3));
+        this.tone(this.inKey(0, 3), 0.26, "triangle", 0.14, 0.2, this.inKey(19, 5));
+        break;
+      case "glitch":
+        for (let i = 0; i < 5; i++) this.tone(200 + ((i * 7919) % 1800), 0.025, "square", 0.08, i * 0.03);
+        this.noise(0.12, 5000, 0.18, 0.02, "highpass");
+        break;
+      case "boing":
+        this.tone(this.inKey(0, 3), 0.32, "sine", 0.3, 0, this.inKey(12, 4));
+        this.tone(this.inKey(7, 3), 0.18, "triangle", 0.12, 0.1, this.inKey(19, 4));
+        break;
+      case "kazoo":
+        this.tone(this.inKey(7, 4), 0.12, "sawtooth", 0.1);
+        this.tone(this.inKey(9, 4), 0.12, "sawtooth", 0.1, 0.12);
+        this.tone(this.inKey(12, 4), 0.2, "sawtooth", 0.11, 0.24, this.inKey(11, 4));
+        break;
+      case "choir":
+        for (const [semi, gn] of [[0, 0.08], [4, 0.06], [7, 0.06], [12, 0.05]] as const) this.tone(this.inKey(semi, 4), 0.7, "triangle", gn);
+        break;
+      case "wobble":
+        for (let i = 0; i < 6; i++) this.tone(this.inKey(i % 2 ? 3 : 0, 3), 0.07, "sine", 0.2, i * 0.07);
+        break;
+      case "tada":
+        this.tone(this.inKey(0, 4), 0.1, "square", 0.1);
+        this.tone(this.inKey(7, 4), 0.1, "square", 0.1, 0.09);
+        this.tone(this.inKey(12, 5), 0.4, "square", 0.12, 0.18);
+        this.tone(this.inKey(16, 5), 0.4, "triangle", 0.1, 0.18);
+        break;
     }
+  }
+
+  /** +1 vida na transição de velocidade: arpejo brilhante, agudo, que não briga com o grito grave. */
+  lifeUp(delay = 0): void {
+    if (!this.ctx) return;
+    const notes = [12, 16, 19, 24, 28];
+    notes.forEach((semi, i) => this.tone(this.inKey(semi, 5), 0.22 + i * 0.04, i % 2 ? "triangle" : "square", 0.1, delay + i * 0.06));
+    this.tone(this.inKey(31, 5), 0.6, "sine", 0.12, delay + 0.3);
+    this.noise(0.25, 7000, 0.06, delay + 0.28, "highpass");
+  }
+
+  /** Começo de um WTF Moment: um "derretimento" curto (o microgame traz o resto). */
+  wtfStart(insane: boolean): void {
+    if (!this.ctx) return;
+    this.sfx("warp");
+    if (insane) this.sfx("glitch");
   }
 
   /** Clique de interface. */

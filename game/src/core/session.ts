@@ -2,6 +2,10 @@
 //
 //   title → between → game → (between | speedup → between)… → over → (start de novo)
 //
+// A cada 10 microgames concluídos (vencidos ou não), quem ainda está vivo passa pela transição de velocidade
+// e recupera 1 vida, até o máximo de START_LIVES. A vida chega junto com o "SPEED UP!", sem tirar tempo de
+// nenhum microgame, e cada marco (10, 20, 30…) só pode dar vida uma vez.
+//
 // Nada daqui é salvo: a partida vive só na memória e some ao recarregar a página.
 import { durationFor, levelFor, pointsFor, SPEEDUP_EVERY, START_LIVES, tierOf } from "./difficulty.ts";
 import { MicroRunner } from "./runner.ts";
@@ -16,7 +20,7 @@ export type SessionEvent =
   | { type: "between"; n: number }
   | { type: "game"; def: MicrogameDef; n: number; duration: number }
   | { type: "result"; result: Result; points: number; def: MicrogameDef }
-  | { type: "speedup"; tier: number }
+  | { type: "speedup"; tier: number; life: boolean }
   | { type: "over"; score: number; cleared: number; played: number };
 
 export interface SessionOpts {
@@ -40,6 +44,8 @@ export function betweenTime(tier: number): number {
 }
 /** Tela de aceleração: corte, locução, virada e volta. Não conta no tempo de nenhum microgame. */
 export const SPEEDUP_TIME = 2.4;
+/** Momento da transição de velocidade (s) em que o coração da vida extra aparece, depois do grito. */
+export const LIFE_POP_AT = 1.45;
 export const OVER_TIME = 1.2;
 
 export class Session {
@@ -60,6 +66,10 @@ export class Session {
   lostTo: MicrogameDef | null = null;
   /** Vidas antes do último resultado (para animar o coração quebrando). */
   livesBefore = START_LIVES;
+  /** A transição de velocidade atual trouxe +1 vida (para a animação do coração aparecendo). */
+  lifeBonus = false;
+  /** Último marco (10, 20, 30…) que já foi processado: nunca dá vida duas vezes no mesmo. */
+  private lastMilestone = 0;
   readonly catalogSize: number;
   lang: Lang;
 
@@ -95,6 +105,8 @@ export class Session {
     this.lostTo = null;
     this.runner = null;
     this.overEmitted = false;
+    this.lifeBonus = false;
+    this.lastMilestone = 0;
     this.seq = new Sequencer(this.o.catalog, this.rng.fork());
     this.emit({ type: "start" });
     this.enter("between");
@@ -193,11 +205,21 @@ export class Session {
       return;
     }
     if (this.played % SPEEDUP_EVERY === 0) {
+      this.lifeBonus = this.grantMilestoneLife(this.played);
       this.enter("speedup");
-      this.emit({ type: "speedup", tier: this.tier });
+      this.emit({ type: "speedup", tier: this.tier, life: this.lifeBonus });
       return;
     }
     this.enter("between");
+  }
+
+  /** +1 vida no marco `played` (10, 20, 30…), se ainda houver espaço e o marco não tiver sido usado. */
+  private grantMilestoneLife(played: number): boolean {
+    if (played <= this.lastMilestone || this.lives <= 0) return false;
+    this.lastMilestone = played;
+    if (this.lives >= START_LIVES) return false;
+    this.lives++;
+    return true;
   }
 
   /** Volta para a tela de título (sem partida em andamento). */

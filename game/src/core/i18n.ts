@@ -24,6 +24,7 @@ export const UI = {
   newBest: { en: "New session best!", pt: "Novo recorde da sessão!" },
   lostTo: { en: "Taken out by", pt: "Derrotado por" },
   speedUp: { en: "SPEED UP!", pt: "ACELERA!" },
+  lifeUp: { en: "+1 LIFE!", pt: "+1 VIDA!" },
   nice: { en: "NICE!", pt: "BOA!" },
   oops: { en: "OOPS!", pt: "ERROU!" },
   ready: { en: "READY?", pt: "PRONTO?" },
