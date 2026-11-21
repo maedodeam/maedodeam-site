@@ -7,13 +7,13 @@
 # - ações oficiais do GitHub fixadas por SHA do commit (uma tag movida não muda o que roda aqui);
 # - nenhum segredo é usado; o build não instala dependências (só Python da própria máquina do GitHub).
 #
-# Ativação: GitHub → Settings → Pages → Source: "GitHub Actions" e descomentar o gatilho "push" abaixo.
+# Ativo desde 2026-11-21 (Settings → Pages → Source: "GitHub Actions"). Rollback: Source "Deploy from a branch", main, /.
 name: Publicar site
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-  # push:
-  #   branches: [main]
 
 permissions: {}
 

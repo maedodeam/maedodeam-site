@@ -6,7 +6,7 @@ GitHub Pages em `https://maedodeam.com.br`.
 Site estático: HTML, CSS e um JavaScript pequeno (opcional — sem ele, tudo funciona, só sem animações).
 Sem framework, sem cookies, sem analytics e sem fontes ou scripts de terceiros. Os HTML publicados são
 **gerados** a partir de `src/` por um script Python sem dependências, e o resultado fica no repositório:
-o GitHub Pages continua servindo a raiz da branch `main`, sem etapa de build.
+o GitHub Actions publica só esses arquivos (`tools/dist.py` → `_site/`), sem gerar nada no servidor.
 
 ```
 maedodeam-site/
@@ -35,7 +35,7 @@ maedodeam-site/
 ├── package.json           ferramentas de desenvolvimento do jogo (esbuild, TypeScript, Playwright)
 ├── tools/assets.py        gera imagens, OG e ícones (só quando uma imagem muda)
 ├── CNAME                  domínio próprio: maedodeam.com.br
-└── .nojekyll              o GitHub Pages publica os arquivos como estão
+└── .nojekyll              (legado do modo "Deploy from a branch"; não vai para o site)
 ```
 
 E-mail institucional, de suporte e de privacidade: `maedodeam@gmail.com`.
@@ -99,7 +99,7 @@ npm run build        # gera assets/play/game.js e as páginas do site
 npm run e2e          # testes de ponta a ponta (desktop e celular) com o site servido localmente
 ```
 
-O `assets/play/game.js` gerado vai para o repositório, como os HTML: o GitHub Pages continua sem etapa de build.
+O `assets/play/game.js` gerado vai para o repositório, como os HTML: a publicação só copia os arquivos (ver "Publicação").
 
 ## Adicionar outro produto
 
@@ -116,6 +116,8 @@ O `assets/play/game.js` gerado vai para o repositório, como os HTML: o GitHub P
 `package.json`, source map, galeria de desenvolvimento ou página sem CSP. `python tools/dist.py --list` mostra a lista.
 O workflow `.github/workflows/pages.yml` publica esse `_site/` pelo GitHub Actions (só em push na `main` ou
 manualmente, nunca em pull request; token com permissão mínima por job; ações oficiais fixadas por SHA).
+Fonte do Pages: **GitHub Actions** (desde 2026-11-21). Para voltar ao modo antigo: Settings → Pages → Source
+"Deploy from a branch", `main`, `/`.
 
 **Segurança do repositório** (público de propósito: qualquer um pode ver, clonar e fazer fork; só quem tem
 escrita altera o original):
