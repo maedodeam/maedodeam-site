@@ -1,10 +1,15 @@
 // Escolhe o próximo microgame. Funciona como um baralho: todos os microgames saem uma vez antes de
 // qualquer repetição. Dentro do baralho, prefere a dificuldade adequada ao momento da partida e evita
 // repetir categoria, família de gesto ou o microgame anterior.
+//
+// Curva: 1ª–10ª fáceis, 11ª–19ª médias, a partir da 20ª as difíceis (●●●), intercaladas com médias e nunca
+// duas difíceis seguidas. Assim quem chega à 30ª já viu todas as difíceis.
 import type { MicrogameDef } from "./types.ts";
 import type { Rng } from "./rng.ts";
 
 const RECENT = 6;
+/** Posição (0 = a 1ª fase) a partir da qual os microgames difíceis podem sair: a 20ª fase. */
+export const HARD_FROM = 19;
 
 export class Sequencer {
   private deck: MicrogameDef[] = [];
@@ -18,9 +23,11 @@ export class Sequencer {
     this.rng = rng;
   }
 
-  /** Dificuldade ideal para a posição n: começa em 1, chega a 3 por volta do 45º. */
+  /** Dificuldade ideal para a posição n: fácil nas 10 primeiras, média até a 19ª, difícil a partir da 20ª. */
   static targetDifficulty(n: number): number {
-    return Math.min(3, 1 + n / 22);
+    if (n < 10) return 1;
+    if (n < HARD_FROM) return 2;
+    return 3;
   }
 
   next(n: number): MicrogameDef {
@@ -40,6 +47,10 @@ export class Sequencer {
       if (last && d.family === last.family) score += 3;
       if (last && prev && d.family === last.family && d.family === prev.family) score += 20;
       if (this.recent.some((r) => r.id === d.id)) score += 40;
+      if (d.difficulty === 3) {
+        if (n < HARD_FROM) score += 100; // antes da 20ª, nunca
+        if (last && last.difficulty === 3) score += 3; // depois de uma difícil, vem uma média
+      }
       score += this.rng.next() * 1.5; // desempate aleatório
       if (score < bestScore) {
         bestScore = score;

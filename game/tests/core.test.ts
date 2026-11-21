@@ -263,6 +263,21 @@ describe("sequenciador", () => {
     const first = Array.from({ length: 8 }, (_, n) => seq.next(n).difficulty);
     assert.ok(first.filter((d) => d === 1).length >= 6, `primeiros: ${first}`);
   });
+
+  test("difíceis só a partir da 20ª fase, nunca duas seguidas, e todas antes da 30ª", () => {
+    // como o catálogo real: poucas difíceis no meio de muitas médias
+    const cat = Array.from({ length: 100 }, (_, i) => fakeDef(i + 1, { difficulty: i < 5 ? 3 : i < 35 ? 1 : 2 }));
+    for (let seed = 1; seed <= 200; seed++) {
+      const seq = new Sequencer(cat, new Rng(seed));
+      const diffs = Array.from({ length: 100 }, (_, n) => seq.next(n).difficulty);
+      const hard = diffs.flatMap((d, n) => (d === 3 ? [n + 1] : []));
+      assert.equal(hard.length, 5);
+      assert.ok(hard[0] >= 20, `seed ${seed}: difícil na fase ${hard[0]}`);
+      assert.ok(hard[4] <= 30, `seed ${seed}: última difícil na fase ${hard[4]}`);
+      for (let i = 1; i < hard.length; i++) assert.ok(hard[i] - hard[i - 1] >= 2, `seed ${seed}: difíceis seguidas em ${hard}`);
+      assert.deepEqual(diffs.slice(0, 10), Array(10).fill(1), `seed ${seed}: as 10 primeiras não são todas fáceis`);
+    }
+  });
 });
 
 // ================= partida =================
