@@ -8,6 +8,7 @@ Uso:  python tools/dist.py            (gera _site/)
 Não gera páginas: copia as que src/build.py já gerou e estão no repositório. Falha se algo proibido
 aparecer no resultado (fonte TypeScript/Python, source map, package.json, Markdown, galeria de dev...).
 """
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -30,6 +31,8 @@ DIRS = {
 FORBIDDEN_SUFFIXES = {".ts", ".py", ".map", ".md", ".mjs", ".cjs", ".tsx", ".lock", ".yml", ".yaml"}
 FORBIDDEN_GAME_APIS = ["localStorage", "sessionStorage", "indexedDB", "document.cookie", "serviceWorker",
                        "sendBeacon", "XMLHttpRequest", "WebSocket", "fetch(", "caches."]
+# Com telemetria ligada (CSP do jogo libera um endereço em connect-src), o jogo pode usar só estas duas, e só para ele.
+TELEMETRY_APIS = {"sendBeacon", "fetch("}
 FORBIDDEN_NAMES = {"package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".nojekyll", "gallery.html", "gallery.js"}
 
 
@@ -51,11 +54,26 @@ def check(files: list[Path]) -> None:
     for p in files:
         if p.suffix == ".html" and b'http-equiv="Content-Security-Policy"' not in p.read_bytes():
             bad.append(f"{p.relative_to(ROOT)} (sem CSP)")
-    # o jogo não guarda nem envia nada (mesma verificação de game/scripts/build.ts)
+    # o jogo não guarda nada; e só fala com a rede se a CSP da página do jogo liberar o serviço de telemetria
     game = (ROOT / "assets/play/game.js").read_text(encoding="utf-8")
+    connect = set()
+    for page in ("play/index.html", "pt-br/play/index.html"):
+        m = re.search(r"connect-src ([^;\"]+)", (ROOT / page).read_text(encoding="utf-8"))
+        connect.add(m.group(1).strip() if m else "?")
+    if len(connect) != 1:
+        bad.append(f"play/: CSP diferente entre os idiomas ({connect})")
+    allowed = connect.pop() if len(connect) == 1 else "'none'"
+    tele = allowed if re.fullmatch(r"https://[a-z0-9.-]+(:\d+)?", allowed, re.I) else None
+    if allowed != "'none'" and not tele:
+        bad.append(f"play/: connect-src inesperado: {allowed}")
     for api in FORBIDDEN_GAME_APIS:
-        if api in game:
+        if api in game and not (tele and api in TELEMETRY_APIS):
             bad.append(f"assets/play/game.js (usa {api})")
+    for url in re.findall(r"https?://[^\s\"'`)]+", game):
+        if not url.startswith("http://www.w3.org/") and not (tele and url.startswith(tele)):
+            bad.append(f"assets/play/game.js (endereço externo {url})")
+    if tele and tele not in game:
+        bad.append("play/: CSP libera telemetria, mas o jogo não foi gerado com ela")
     if bad:
         sys.exit("ERRO: não pode ser publicado:\n  " + "\n  ".join(bad))
 

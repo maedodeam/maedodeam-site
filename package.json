@@ -7,8 +7,10 @@
     "build": "node game/scripts/build.ts && python src/build.py",
     "build:game": "node game/scripts/build.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --import ./game/tests/helpers/setup.ts --test --test-reporter=dot \"game/tests/**/*.test.ts\"",
+    "test": "node --import ./game/tests/helpers/setup.ts --test --test-reporter=dot \"game/tests/**/*.test.ts\" \"telemetry/tests/**/*.test.ts\"",
     "e2e": "playwright test -c game/e2e/playwright.config.ts",
+    "telemetry:local": "node telemetry/scripts/local.ts",
+    "telemetry:catalog": "node --import ./game/tests/helpers/setup.ts telemetry/scripts/gen-catalog.ts",
     "check": "npm run typecheck && npm test && npm run build && python src/build.py --check"
   },
   "engines": {

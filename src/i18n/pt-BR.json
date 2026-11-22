@@ -221,6 +221,7 @@
     "play": "JOGAR",
     "controls": "Mouse, teclado ou toque. Cada jogo diz como.",
     "note": "Nada fica guardado. Fechou a página, sumiu.",
+    "note_telemetry": "Nada fica guardado no seu aparelho. Estatísticas anônimas de jogo ajudam a equilibrar as fases — sem nome, sem rastreio.",
     "canvas_label": "Área do jogo Microgame Mayhem",
     "noscript": "O Microgame Mayhem precisa de JavaScript para rodar.",
     "pause": "Pausar",

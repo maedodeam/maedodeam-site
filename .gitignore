@@ -4,3 +4,4 @@ game/.dev/
 test-results/
 playwright-report/
 _site/
+telemetry/.local/

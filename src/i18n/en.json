@@ -221,6 +221,7 @@
     "play": "PLAY",
     "controls": "Mouse, keyboard or touch. Each game tells you how.",
     "note": "Nothing is stored. Close the page and it's gone.",
+    "note_telemetry": "Nothing is stored on your device. Anonymous game stats help us balance the microgames — no names, no tracking.",
     "canvas_label": "Microgame Mayhem game area",
     "noscript": "Microgame Mayhem needs JavaScript to run.",
     "pause": "Pause",

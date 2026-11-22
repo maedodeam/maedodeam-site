@@ -16,5 +16,5 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["game/src/**/*.ts", "game/tests/**/*.ts", "game/scripts/**/*.ts", "game/dev/**/*.ts", "game/e2e/**/*.ts"]
+  "include": ["game/src/**/*.ts", "game/tests/**/*.ts", "game/scripts/**/*.ts", "game/dev/**/*.ts", "game/e2e/**/*.ts", "telemetry/**/*.ts"]
 }

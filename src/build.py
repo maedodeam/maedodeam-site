@@ -144,9 +144,24 @@ def version(*files):
     return h.hexdigest()[:8]
 
 
+def telemetry_origin():
+    """Origem do serviço de telemetria (telemetry/client.config.json), ou None se a telemetria estiver desligada."""
+    cfg = json.loads((ROOT / "telemetry" / "client.config.json").read_text(encoding="utf-8"))
+    endpoint = (cfg.get("endpoint") or "").strip()
+    if not endpoint:
+        return None
+    m = re.match(r"^(https://[a-z0-9.-]+(?::\d+)?|http://(?:127\.0\.0\.1|localhost):\d+)(?:/|$)", endpoint, re.I)
+    if not m:
+        raise SystemExit(f"telemetry/client.config.json: endpoint inválido: {endpoint}")
+    return m.group(1)
+
+
 def build():
     out = {}
-    site = {"version": version(), "play_version": version("assets/play/game.js", "assets/play/play.css"), "email": EMAIL}
+    tele = telemetry_origin()
+    site = {"version": version(), "play_version": version("assets/play/game.js", "assets/play/play.css"), "email": EMAIL,
+            # CSP do jogo: sem telemetria, nenhuma conexão; com ela, só o endereço do serviço
+            "connect_src": tele if tele else "'none'"}
     texts = {lang: load(lang) for lang in LANGS}
 
     for lang, cfg in LANGS.items():
@@ -196,6 +211,9 @@ def build():
         p_url = f"{SITE}/{cfg['dir']}play/"
         p_alt = [("en", f"{SITE}/play/"), ("pt-BR", f"{SITE}/pt-br/play/"), ("x-default", f"{SITE}/play/")]
         pt_ = dict(t, meta=dict(t["meta"], title=t["play"]["meta_title"], description=t["play"]["meta_description"]))
+        if tele:
+            # com telemetria, o aviso da tela inicial muda: nada fica no aparelho, mas há estatísticas anônimas
+            pt_ = dict(pt_, play=dict(t["play"], note=t["play"]["note_telemetry"]))
         proot = root + "../"
         ppage = {
             "lang": lang, "root": proot, "home": "../",
