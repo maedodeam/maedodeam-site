@@ -1,4 +1,4 @@
-// Cliente de telemetria: lotes, eventos críticos imediatos, falhas que nunca quebram o jogo, offline, DNT/GPC.
+// Cliente de telemetria: lotes grandes, Game Over/abandono imediatos, falhas que nunca quebram o jogo, offline, DNT/GPC.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { Telemetry, FLUSH_AT, MAX_FAILURES, MAX_QUEUE, type Transport, type WireEvent } from "../src/telemetry/client.ts";
@@ -39,20 +39,33 @@ function make(o: { fail?: boolean; online?: boolean; optedOut?: boolean } = {}) 
 const result = (n: number, r: "win" | "lose" = "win") => ({ n, mg: "swat-fly", result: r, level: 0.25, tier: 1, dur: 7, used: 2.345, lives: 4, input: "mouse" });
 
 describe("cliente de telemetria", () => {
-  test("game_start sai na hora; resultados comuns esperam o lote (por tempo ou por quantidade)", () => {
+  test("eventos esperam o lote (por tempo ou por quantidade); o game_start vai junto com o primeiro", () => {
     const { tele, sent, runTimers } = make();
     tele.startRun({ lang: "pt", device: "mobile" });
-    assert.equal(sent.length, 1);
-    assert.equal(sent[0].url, "https://telemetria.exemplo.dev/v1/events");
-    assert.equal(sent[0].events[0].type, "game_start");
     tele.result(result(1));
     tele.result(result(2));
-    assert.equal(sent.length, 1, "ainda no lote");
+    assert.equal(sent.length, 0, "ainda no lote");
     runTimers();
-    assert.equal(sent.length, 2);
-    assert.deepEqual(sent[1].events.map((e) => e.seq), [1, 2]);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].url, "https://telemetria.exemplo.dev/v1/events");
+    assert.deepEqual(sent[0].events.map((e) => [e.seq, e.type]), [[0, "game_start"], [1, "microgame_result"], [2, "microgame_result"]]);
     for (let i = 0; i < FLUSH_AT; i++) tele.result(result(3 + i));
-    assert.equal(sent.length, 3, "lote cheio sai sem esperar o tempo");
+    assert.equal(sent.length, 2, "lote cheio sai sem esperar o tempo");
+    assert.equal(sent[1].events.length, FLUSH_AT);
+  });
+
+  test("uma partida típica sai em poucos lotes (cada lote = 1 requisição e 1 linha escrita no D1)", () => {
+    const { tele, sent, tick, runTimers } = make();
+    tele.startRun({ lang: "pt", device: "mobile" });
+    for (let n = 1; n <= 15; n++) {
+      tick(6000); // ~6 s por microgame; o temporizador de 30 s dispara a cada 5
+      tele.result(result(n, n % 3 ? "win" : "lose"));
+      if (n % 3 === 0) tele.lifeChanged({ n, from: 4 - n / 3, to: 3 - n / 3, reason: "lose" });
+      if (n % 5 === 0) runTimers();
+    }
+    tele.gameOver({ n: 15, score: 1000, wins: 10 });
+    assert.ok(sent.length <= 4, `lotes: ${sent.length}`);
+    assert.equal(sent.flatMap((s) => s.events).length, 22, "nenhum evento perdido");
   });
 
   test("cada evento tem id único, a partida tem UUID e o tempo é relativo ao início", () => {
@@ -75,7 +88,7 @@ describe("cliente de telemetria", () => {
     assert.equal(tele.active, false);
     const last = sent[sent.length - 1];
     assert.equal(last.unloading, true);
-    assert.deepEqual(last.events.map((e) => e.type), ["microgame_result", "game_abandon"], "o que estava na fila vai junto");
+    assert.deepEqual(last.events.map((e) => e.type), ["game_start", "microgame_result", "game_abandon"], "o que estava na fila vai junto");
     tele.result(result(2));
     assert.equal(sent.flatMap((s) => s.events).length, 3, "depois do abandono, nada mais é enviado nessa partida");
   });
@@ -85,7 +98,7 @@ describe("cliente de telemetria", () => {
     tele.startRun({ lang: "pt", device: "mobile" });
     tele.result({ ...result(1), level: 0.333333, used: 99, dur: 5 });
     runTimers();
-    const ev = sent[1].events[0];
+    const ev = sent[0].events[1];
     assert.equal(ev.level, 0.33);
     assert.equal(ev.used, 5, "tempo usado nunca passa da duração");
   });
@@ -126,10 +139,11 @@ describe("cliente de telemetria", () => {
     assert.equal(tele.disabled, true);
     tele.result(result(2));
     tele.gameOver({ n: 2, score: 0, wins: 1 });
-    assert.equal(sent.length, 1, "só o game_start, enviado antes de desligar");
+    assert.equal(sent.length, 0, "a fila foi descartada: nada saiu");
     tele.setUserEnabled(true);
     tele.startRun({ lang: "pt", device: "mobile" });
-    assert.equal(sent.length, 2, "ligado de novo, a próxima partida é enviada");
+    tele.gameOver({ n: 0, score: 0, wins: 0 });
+    assert.equal(sent.length, 1, "ligado de novo, a próxima partida é enviada");
   });
 
   test("com Do Not Track / GPC, o botão não consegue ligar", () => {

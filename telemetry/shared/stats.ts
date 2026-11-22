@@ -15,6 +15,7 @@
 //   · em andamento: sem fim e com evento recente; fica fora das taxas e dos níveis finais.
 import type { D1Database } from "./d1.ts";
 import { CATALOG } from "./catalog.gen.ts";
+import { SQL_DAY, dayOf, mgSelect } from "./store.ts";
 
 export interface Filters {
   from?: number; // ms
@@ -44,17 +45,6 @@ function runWhere(f: Filters): { sql: string; args: unknown[] } {
   if (f.to != null) (c.push("started_at < ?"), a.push(f.to));
   if (f.device) (c.push("device = ?"), a.push(f.device));
   if (f.version) (c.push("version = ?"), a.push(f.version));
-  return { sql: c.length ? `WHERE ${c.join(" AND ")}` : "", args: a };
-}
-
-function resultWhere(f: Filters, withDifficulty = true): { sql: string; args: unknown[] } {
-  const c: string[] = [];
-  const a: unknown[] = [];
-  if (f.from != null) (c.push("received_at >= ?"), a.push(f.from));
-  if (f.to != null) (c.push("received_at < ?"), a.push(f.to));
-  if (f.device) (c.push("device = ?"), a.push(f.device));
-  if (f.version) (c.push("version = ?"), a.push(f.version));
-  if (withDifficulty && f.difficulty) (c.push("difficulty = ?"), a.push(f.difficulty));
   return { sql: c.length ? `WHERE ${c.join(" AND ")}` : "", args: a };
 }
 
@@ -160,18 +150,70 @@ export async function summary(db: D1Database, f: Filters) {
   };
 }
 
-export async function microgames(db: D1Database, f: Filters) {
-  const w = resultWhere(f);
-  const rows = await db
+/** Linha agregada por microgame × aparelho × versão (dias já agregados + eventos crus dos dias que faltam). */
+export interface MgRow {
+  num: number;
+  device: string;
+  version: string;
+  attempts: number;
+  wins: number;
+  runs: number;
+  runs_won: number;
+  used_frac: number;
+}
+
+const BY_NUM = new Map(Object.entries(CATALOG).map(([id, c]) => [c[0], { id, difficulty: c[1], wtf: c[2] }]));
+
+/**
+ * Resultados por microgame no período. Dias já fechados vêm de mg_daily (poucas linhas); só os dias ainda não
+ * agregados (normalmente hoje) leem os eventos crus. Períodos contam dias inteiros no horário de Brasília.
+ */
+export async function mgRows(db: D1Database, f: Filters): Promise<MgRow[]> {
+  const fromDay = f.from != null ? dayOf(f.from) : null;
+  const toDay = f.to != null ? dayOf(f.to) : null; // exclusivo (o dashboard manda a meia-noite seguinte)
+  const dc: string[] = [];
+  const da: unknown[] = [];
+  if (fromDay != null) (dc.push("day >= ?"), da.push(fromDay));
+  if (toDay != null) (dc.push("day < ?"), da.push(toDay));
+  if (f.device) (dc.push("device = ?"), da.push(f.device));
+  if (f.version) (dc.push("version = ?"), da.push(f.version));
+  const daily = await db
     .prepare(
-      `SELECT mg, count(*) AS attempts, coalesce(sum(result = 'win'), 0) AS wins,
-              count(DISTINCT run_id) AS runs, count(DISTINCT CASE WHEN result = 'win' THEN run_id END) AS runs_won,
-              avg(used / dur) AS time_frac
-       FROM results ${w.sql} GROUP BY mg`,
+      `SELECT num, device, version, sum(attempts) AS attempts, sum(wins) AS wins, sum(runs) AS runs, sum(runs_won) AS runs_won, sum(used_frac) AS used_frac
+       FROM mg_daily ${dc.length ? "WHERE " + dc.join(" AND ") : ""} GROUP BY num, device, version`,
     )
-    .bind(...w.args)
-    .all<{ mg: string; attempts: number; wins: number; runs: number; runs_won: number; time_frac: number | null }>();
-  const by = new Map(rows.results.map((x) => [x.mg, x]));
+    .bind(...da)
+    .all<MgRow>();
+  const rc: string[] = [`NOT EXISTS (SELECT 1 FROM rollup_days d WHERE d.day = ${SQL_DAY})`];
+  const ra: unknown[] = [];
+  if (f.from != null) (rc.push("r.started_at >= ?"), ra.push(f.from));
+  if (f.to != null) (rc.push("r.started_at < ?"), ra.push(f.to));
+  if (f.device) (rc.push("r.device = ?"), ra.push(f.device));
+  if (f.version) (rc.push("r.version = ?"), ra.push(f.version));
+  const raw = await db.prepare(mgSelect(rc.join(" AND "))).bind(...ra).all<MgRow>();
+  return [...daily.results, ...raw.results];
+}
+
+/** Soma linhas por uma chave. */
+function sumBy<K>(rows: MgRow[], key: (r: MgRow) => K) {
+  const m = new Map<K, { attempts: number; wins: number; runs: number; runs_won: number; used_frac: number }>();
+  for (const r of rows) {
+    const k = key(r);
+    const x = m.get(k) ?? { attempts: 0, wins: 0, runs: 0, runs_won: 0, used_frac: 0 };
+    x.attempts += Number(r.attempts);
+    x.wins += Number(r.wins);
+    x.runs += Number(r.runs);
+    x.runs_won += Number(r.runs_won);
+    x.used_frac += Number(r.used_frac);
+    m.set(k, x);
+  }
+  return m;
+}
+
+export async function microgames(db: D1Database, f: Filters) {
+  const rows = (await mgRows(db, f)).filter((r) => !f.difficulty || BY_NUM.get(Number(r.num))?.difficulty === f.difficulty);
+  const byNum = sumBy(rows, (r) => Number(r.num));
+  const by = new Map([...byNum].map(([num, x]) => [BY_NUM.get(num)?.id ?? `#${num}`, { ...x, time_frac: x.attempts ? x.used_frac / x.attempts : null }]));
   const list = Object.entries(CATALOG)
     .filter(([, c]) => !f.difficulty || c[1] === f.difficulty)
     .map(([id, [num, difficulty, wtf, namePt, nameEn]]) => {
@@ -238,19 +280,17 @@ export async function compare(db: D1Database, f: Filters) {
         mean_level: x.mean_level != null ? Math.round(x.mean_level * 100) / 100 : null,
       };
     });
-  const rw = resultWhere({ ...f, device: undefined, version: undefined, difficulty: undefined }, false);
-  const resultsBy = async (col: "device" | "difficulty" | "version" | "wtf") =>
-    (
-      await db
-        .prepare(`SELECT coalesce(${col}, '?') AS key, count(*) AS attempts, coalesce(sum(result = 'win'), 0) AS wins FROM results ${rw.sql} GROUP BY ${col} ORDER BY attempts DESC LIMIT 50`)
-        .bind(...rw.args)
-        .all<{ key: string | number; attempts: number; wins: number }>()
-    ).results.map((x) => ({ ...x, success_pct: pct(x.wins, x.attempts) }));
+  const all = await mgRows(db, { ...f, device: undefined, version: undefined, difficulty: undefined });
+  const resultsBy = (key: (r: MgRow) => string | number) =>
+    [...sumBy(all, key)]
+      .map(([k, x]) => ({ key: k, attempts: x.attempts, wins: x.wins, success_pct: pct(x.wins, x.attempts) }))
+      .sort((a, b) => b.attempts - a.attempts)
+      .slice(0, 50);
   return {
-    device: { runs: await runsBy("device"), results: await resultsBy("device") },
-    version: { runs: await runsBy("version"), results: await resultsBy("version") },
-    difficulty: await resultsBy("difficulty"),
-    wtf: await resultsBy("wtf"),
+    device: { runs: await runsBy("device"), results: resultsBy((r) => r.device) },
+    version: { runs: await runsBy("version"), results: resultsBy((r) => r.version) },
+    difficulty: resultsBy((r) => BY_NUM.get(Number(r.num))?.difficulty ?? "?"),
+    wtf: resultsBy((r) => BY_NUM.get(Number(r.num))?.wtf ?? "?"),
   };
 }
 

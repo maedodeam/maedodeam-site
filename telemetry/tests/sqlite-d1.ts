@@ -34,6 +34,7 @@ class Stmt implements D1PreparedStatement {
   async run(): Promise<D1Result> {
     SqliteD1.count();
     const r = this.db.prepare(this.sql).run(...this.params);
+    SqliteD1.changes += Number(r.changes);
     return { results: [], success: true, meta: { changes: Number(r.changes) } };
   }
   async all<T>(): Promise<D1Result<T>> {
@@ -49,6 +50,8 @@ class Stmt implements D1PreparedStatement {
 export class SqliteD1 implements D1Database {
   /** Consultas feitas desde o último reset (cada db.batch conta 1, como no D1). */
   static queries = 0;
+  /** Linhas alteradas (sem contar índices) desde o último reset. */
+  static changes = 0;
   static count(): void {
     SqliteD1.queries++;
   }
@@ -69,6 +72,7 @@ export class SqliteD1 implements D1Database {
       for (const s of statements) {
         const st = s as Stmt;
         const r = this.raw.prepare(st.sql).run(...st.params);
+        SqliteD1.changes += Number(r.changes);
         out.push({ results: [], success: true, meta: { changes: Number(r.changes) } });
       }
       this.raw.exec("COMMIT");

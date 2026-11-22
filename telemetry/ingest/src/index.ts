@@ -4,12 +4,14 @@
 // Segurança (eventos do navegador podem ser falsificados):
 // - só POST /v1/events (e o preflight OPTIONS), corpo pequeno, JSON no formato exato do contrato;
 // - CORS só para a origem do jogo (não é autenticação: só impede outros sites de enviar pelo navegador);
-// - limite de requisições por IP (o IP é usado só em memória/no limitador; nunca vai para o banco);
+// - limites de requisições nativos da Cloudflare: por IP (IPv6 por prefixo /64) e um teto global por local; o IP é
+//   usado só no limitador e em memória, nunca vai para o banco;
+// - um lote = uma partida: cada requisição escreve no máximo 2 linhas no D1 (custo previsível mesmo sob abuso);
 // - limites por partida e catálogo conferido no servidor (ver shared/validate.ts e shared/store.ts);
 // - respostas sem dados: 204, ou um código de erro genérico.
 import type { D1Database } from "../../shared/d1.ts";
 import { MAX_BODY_BYTES, parseBatch } from "../../shared/validate.ts";
-import { purgeOld, storeEvents } from "../../shared/store.ts";
+import { purgeOld, rollup, storeEvents } from "../../shared/store.ts";
 
 export interface Env {
   DB: D1Database;
@@ -17,13 +19,19 @@ export interface Env {
   ALLOWED_ORIGINS: string;
   /** Dias de retenção das métricas (padrão 180; sempre entre 30 e 400). Igual a retention_days da política. */
   RETENTION_DAYS?: string;
-  /** Limitador de requisições da Cloudflare (binding [[ratelimits]]), se configurado. */
-  RATE_LIMITER?: { limit(o: { key: string }): Promise<{ success: boolean }> };
+  /** Limitador nativo da Cloudflare por IP (binding [[ratelimits]]). */
+  RATE_LIMITER?: Limiter;
+  /** Limitador nativo da Cloudflare global (uma chave só): teto de requisições por local, protege a cota do D1. */
+  GLOBAL_LIMITER?: Limiter;
+}
+
+interface Limiter {
+  limit(o: { key: string }): Promise<{ success: boolean }>;
 }
 
 const PATH = "/v1/events";
-/** Limitador em memória (por isolate), somado ao binding da Cloudflare. */
-const FALLBACK_LIMIT = 60; // requisições por janela, por IP (igual ao binding no wrangler.toml)
+/** Contador em memória (por isolate), somado aos bindings da Cloudflare. Mesmo número do binding por IP. */
+const FALLBACK_LIMIT = 100; // requisições por janela, por IP
 const WINDOW_MS = 10_000;
 const memory = new Map<string, { count: number; reset: number }>();
 
@@ -53,26 +61,46 @@ function allowedOrigin(req: Request, env: Env): string | null {
 }
 
 /**
- * Duas camadas, ambas precisam aprovar: o binding da Cloudflare (aproximado, contado por local e com
- * consistência eventual — com janela de 60s deixou passar 180 seguidas; com 10s segurou) e um contador em memória
- * por isolate, que pega rajadas de um mesmo cliente com precisão.
+ * Chave do limite por "cliente": IPv4 inteiro; IPv6 pelo prefixo /64 (uma casa/aparelho recebe um /64 inteiro e
+ * poderia trocar de endereço a cada requisição para escapar do limite).
+ */
+export function clientKey(ip: string | null): string {
+  if (!ip) return "unknown";
+  if (!ip.includes(":")) return ip;
+  const [head, tail = ""] = ip.toLowerCase().split("::");
+  const h = head ? head.split(":") : [];
+  const t = tail ? tail.split(":") : [];
+  const full = [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill("0"), ...t];
+  return full.slice(0, 4).map((x) => x.replace(/^0+(?=.)/, "")).join(":") + "::/64";
+}
+
+async function allowed(limiter: Limiter | undefined, key: string): Promise<boolean> {
+  try {
+    return limiter ? (await limiter.limit({ key })).success : true;
+  } catch {
+    return true; // binding indisponível: valem as outras camadas
+  }
+}
+
+/**
+ * Três camadas, todas precisam aprovar:
+ * 1. binding nativo por cliente (Cloudflare): aproximado, contado por local, consistência eventual — segura fluxo
+ *    contínuo, mas uma rajada simultânea passa antes de os contadores sincronizarem (documentado pela Cloudflare);
+ * 2. binding nativo global (uma chave para todos): teto por local, contra abuso vindo de muitos IPs;
+ * 3. contador em memória por isolate: pega rajadas de um mesmo cliente que caem na mesma instância.
  */
 async function underLimit(req: Request, env: Env, now: number): Promise<boolean> {
-  const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
-  let slot = memory.get(ip);
+  const key = clientKey(req.headers.get("cf-connecting-ip"));
+  let slot = memory.get(key);
   if (!slot || slot.reset <= now) {
     if (memory.size > 10000) memory.clear();
     slot = { count: 0, reset: now + WINDOW_MS };
-    memory.set(ip, slot);
+    memory.set(key, slot);
   }
   slot.count++;
   if (slot.count > FALLBACK_LIMIT) return false;
-  try {
-    if (env.RATE_LIMITER) return (await env.RATE_LIMITER.limit({ key: ip })).success;
-  } catch {
-    /* binding indisponível: vale só o contador em memória */
-  }
-  return true;
+  if (!(await allowed(env.RATE_LIMITER, key))) return false;
+  return allowed(env.GLOBAL_LIMITER, "all");
 }
 
 /** Retenção efetiva, sempre entre 30 e 400 dias (padrão 180). */
@@ -111,6 +139,8 @@ export async function handle(req: Request, env: Env, now = Date.now()): Promise<
   if (text.length > MAX_BODY_BYTES) return reply(413, origin);
   const batch = parseBatch(text);
   if (!batch || batch.events.length === 0) return reply(400, origin);
+  // um lote = uma partida (o jogo sempre manda assim): limita a 2 linhas escritas por requisição
+  if (new Set(batch.events.map((e) => e.run)).size > 1) return reply(400, origin);
   try {
     await storeEvents(env.DB, batch.events, now);
   } catch {
@@ -123,8 +153,10 @@ export default {
   fetch(req: Request, env: Env): Promise<Response> {
     return handle(req, env).catch(() => reply(500));
   },
-  /** Cron diário: retenção dos dados brutos. */
+  /** Cron diário (04:17 em Brasília): agregados por microgame dos dias fechados e retenção. */
   async scheduled(_event: unknown, env: Env): Promise<void> {
-    await purgeOld(env.DB, Date.now(), retentionDays(env));
+    const now = Date.now();
+    await rollup(env.DB, now);
+    await purgeOld(env.DB, now, retentionDays(env));
   },
 };

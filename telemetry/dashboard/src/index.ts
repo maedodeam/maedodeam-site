@@ -36,7 +36,7 @@ export function parseFilters(url: URL, env: Env, now: number): Filters {
   const q = url.searchParams;
   const day = (s: string | null, end = false) => {
     if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined;
-    const t = Date.parse(`${s}T00:00:00Z`);
+    const t = Date.parse(`${s}T00:00:00-03:00`); // dias de Brasília, iguais aos da agregação diária
     return Number.isFinite(t) ? t + (end ? 86_400_000 : 0) : undefined;
   };
   const device = q.get("device");

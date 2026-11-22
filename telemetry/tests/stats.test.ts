@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { compare, describe as describeLevels, microgames, ranking, summary, toCsv, type Filters } from "../shared/stats.ts";
 import { FakeRun, ingestEnv, send } from "./helpers.ts";
+import { dayOf, dayStart, purgeOld, rollup, rollupStatements } from "../shared/store.ts";
 
 const NOW = Date.UTC(2026, 10, 22, 12, 0, 0);
 const MIN = 60_000;
@@ -161,5 +162,49 @@ describe("estatísticas", () => {
   test("CSV: escapa vírgulas, aspas e impede fórmulas", () => {
     const csv = toCsv([{ a: "x,y", b: 'diz "oi"', c: "=1+1", d: null }]);
     assert.equal(csv, 'a,b,c,d\r\n"x,y","diz ""oi""",\'=1+1,\r\n');
+  });
+});
+
+describe("agregação diária (cron): mesmas métricas lendo muito menos", () => {
+  const strip = (x: unknown) => JSON.parse(JSON.stringify(x));
+
+  test("depois de agregar, microgames e comparativos dão exatamente o mesmo resultado", async () => {
+    const env = await scenario();
+    const later = NOW + 86_400_000; // no dia seguinte o cron agrega o dia do cenário
+    const f: Filters = { ...F0, now: later };
+    const before = strip({ mg: await microgames(env.DB, f), cmp: await compare(env.DB, f), mob: await microgames(env.DB, { ...f, device: "mobile", difficulty: 1 }) });
+    const days = await rollup(env.DB, later);
+    assert.ok(days.includes(dayOf(NOW)));
+    assert.ok((env.DB.raw.prepare("SELECT count(*) c FROM mg_daily").get() as { c: number }).c > 0);
+    const after = strip({ mg: await microgames(env.DB, f), cmp: await compare(env.DB, f), mob: await microgames(env.DB, { ...f, device: "mobile", difficulty: 1 }) });
+    assert.deepEqual(after, before);
+  });
+
+  test("agregar de novo não duplica (idempotente) e o dia não agregado continua vindo dos eventos crus", async () => {
+    const env = await scenario();
+    const later = NOW + 86_400_000;
+    assert.deepEqual(await rollup(env.DB, later), [dayOf(NOW) - 6, dayOf(NOW) - 5, dayOf(NOW) - 4, dayOf(NOW) - 3, dayOf(NOW) - 2, dayOf(NOW) - 1, dayOf(NOW)]);
+    assert.deepEqual(await rollup(env.DB, later), [], "cada dia é agregado uma vez");
+    await env.DB.batch(rollupStatements(env.DB, dayOf(NOW), later)); // refazer à mão um dia também não duplica
+    const R = new FakeRun("v3", "tablet"); // partida de "hoje" (dia ainda não agregado)
+    await send(env, [R.start(), R.result(1, "swat-fly", "win")], later);
+    const f: Filters = { ...F0, now: later };
+    const m = await microgames(env.DB, f);
+    const swat = m.microgames.find((x) => x.id === "swat-fly")!;
+    assert.equal(swat.attempts, 12, "11 do dia agregado (uma vez só) + 1 de hoje, cru");
+    assert.equal(swat.runs, 8, "7 partidas do cenário + 1 de hoje");
+  });
+
+  test("dia = data em Brasília (UTC−3): 01:00 UTC ainda é o dia anterior", () => {
+    const t = Date.UTC(2026, 10, 22, 1, 0, 0); // 21/11 às 22:00 em Brasília
+    assert.equal(dayOf(t), dayOf(Date.UTC(2026, 10, 21, 12, 0, 0)));
+    assert.equal(dayStart(dayOf(t)), Date.UTC(2026, 10, 21, 3, 0, 0));
+  });
+
+  test("retenção apaga partidas e agregados antigos", async () => {
+    const env = await scenario();
+    await rollup(env.DB, NOW + 86_400_000);
+    await purgeOld(env.DB, NOW + 200 * 86_400_000, 180);
+    for (const t of ["runs", "mg_daily", "rollup_days"]) assert.equal((env.DB.raw.prepare(`SELECT count(*) c FROM ${t}`).get() as { c: number }).c, 0, t);
   });
 });

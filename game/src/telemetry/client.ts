@@ -48,9 +48,13 @@ export interface TelemetryOpts {
 
 /** Tamanho máximo de um lote (o servidor aceita até 30). */
 export const MAX_BATCH = 25;
-/** Eventos comuns esperam até este tempo (ms) ou até juntar este tanto para sair num lote só. */
-export const FLUSH_MS = 4000;
-export const FLUSH_AT = 10;
+/**
+ * Eventos comuns esperam até este tempo (ms) ou até juntar este tanto para sair num lote só. Lotes maiores = menos
+ * requisições e menos escritas no D1 (cada lote custa 1 linha por partida). Ao ocultar/fechar a página, Game Over
+ * ou abandono, a fila sai na hora (sendBeacon quando a página está saindo), então quase nada se perde.
+ */
+export const FLUSH_MS = 30_000;
+export const FLUSH_AT = 20;
 /** Depois de tantas falhas seguidas, desiste nesta aba (sem insistir, sem acumular). */
 export const MAX_FAILURES = 3;
 /** Limite da fila em memória: o excedente é descartado. */
@@ -121,7 +125,7 @@ export class Telemetry {
     this.run = safe(() => this.o.uuid(), null);
     this.seq = 0;
     this.t0 = this.o.now();
-    this.push("game_start", { lang: ctx.lang, device: ctx.device }, true);
+    this.push("game_start", { lang: ctx.lang, device: ctx.device }); // vai junto com o primeiro lote
   }
 
   result(d: { n: number; mg: string; result: "win" | "lose"; level: number; tier: number; dur: number; used: number; lives: number; input: string }): void {
