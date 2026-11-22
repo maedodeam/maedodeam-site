@@ -117,6 +117,20 @@ describe("ingestão: validação (eventos podem ser falsificados)", () => {
   });
 });
 
+describe("ingestão: limites do D1 gratuito", () => {
+  test("lote máximo (30 eventos) cabe nos limites: ≤ 100 parâmetros por comando e ≤ 50 consultas por requisição", async () => {
+    const { SqliteD1 } = await import("./sqlite-d1.ts");
+    const env = ingestEnv();
+    const r = new FakeRun();
+    const events = [r.start(), ...Array.from({ length: 29 }, (_, i) => r.result(i + 1, "swat-fly", i % 2 ? "win" : "lose", 3))];
+    SqliteD1.queries = 0;
+    const res = await send(env, events);
+    assert.equal(res.status, 204, "nenhum comando passou de 100 parâmetros");
+    assert.ok(SqliteD1.queries <= 3, `consultas: ${SqliteD1.queries} (2 leituras + 1 batch)`);
+    assert.equal(count(env, "results"), 29);
+  });
+});
+
 describe("ingestão: superfície mínima, CORS e limites", () => {
   test("nenhuma rota de leitura ou administração existe aqui", async () => {
     const env = ingestEnv();

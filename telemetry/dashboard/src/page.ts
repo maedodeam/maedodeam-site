@@ -31,9 +31,10 @@ export const PAGE_HTML = `<!doctype html>
     <div><h2>Progressão: % que chega ao microgame N <small id="n-prog"></small></h2><div id="progression" class="chart"></div></div>
   </section>
   <section class="two">
-    <div><h2>Abandono confirmado: em que ponto (microgames concluídos) <small id="n-ab"></small></h2><div id="abandon" class="chart"></div></div>
-    <div><h2>Sem fim registrado: última posição conhecida <small id="n-ne"></small></h2><div id="noend" class="chart"></div></div>
+    <div><h2>Abandono voluntário (saiu pelo menu): em que ponto <small id="n-ab"></small></h2><div id="abandon" class="chart"></div></div>
+    <div><h2>Saída detectada (fechou a página): em que ponto <small id="n-ex"></small></h2><div id="exits" class="chart"></div></div>
   </section>
+  <section><h2>Sem fim registrado: última posição conhecida <small id="n-ne"></small></h2><div id="noend" class="chart"></div></section>
   <section><h2>Comparativos</h2><div id="compare" class="grid"></div></section>
   <section class="two">
     <div><h2>Maiores taxas de sucesso <small id="n-rank"></small></h2><ol id="easiest" class="rank"></ol></div>
@@ -178,7 +179,8 @@ async function load() {
   $("cards").replaceChildren(
     card("Partidas iniciadas", fmt(r.total), r.start_missing ? r.start_missing + " sem game_start recebido" : "partidas, não jogadores"),
     card("Game Over", fmt(r.game_over.n), fmt(r.game_over.pct, "% · fim confirmado")),
-    card("Abandono confirmado", fmt(r.abandoned_confirmed.n), fmt(r.abandoned_confirmed.pct, "% · saiu: ") + r.abandoned_confirmed.quit + " · fechou: " + r.abandoned_confirmed.pagehide),
+    card("Abandono voluntário", fmt(r.abandon_voluntary.n), fmt(r.abandon_voluntary.pct, "% · saiu pelo menu")),
+    card("Saída detectada", fmt(r.exit_detected.n), fmt(r.exit_detected.pct, "% · fechou/trocou de página")),
     card("Sem fim registrado", fmt(r.no_end.n), fmt(r.no_end.pct, "% · não confirmado")),
     card("· presumido", fmt(r.no_end_presumed.n), "sequência completa, parou de enviar"),
     card("· falha de envio", fmt(r.no_end_comm.n), "faltam eventos"),
@@ -186,26 +188,27 @@ async function load() {
     card("Nível mediano", fmt(s.levels.median), "n = " + s.levels.n + " partidas"),
     card("Nível mais frequente", fmt(s.levels.mode), "moda · n = " + s.levels.n + " partidas"),
   );
-  $("abandon-note").textContent = "Nível = microgames concluídos na partida (0 = saiu durante o primeiro). Percentuais sobre as partidas sem atividade recente. \\"Sem fim registrado\\" NÃO é abandono confirmado: são partidas sem Game Over e sem aviso de saída há mais de " + s.abandon_after_min + " min (presumido = sequência completa; falha de envio = faltam eventos).";
+  $("abandon-note").textContent = "Nível = microgames concluídos na partida (0 = saiu durante o primeiro). Percentuais sobre as partidas sem atividade recente. Abandono voluntário = saiu pelo menu (escolha de parar). Saída detectada = a página foi fechada ou trocada no meio da partida: registrada, mas não tratada como decisão de abandonar. \\"Sem fim registrado\\" = sem Game Over e sem aviso de saída há mais de " + s.abandon_after_min + " min (presumido = sequência completa; falha de envio = faltam eventos): não é abandono.";
   $("n-bands").textContent = "n = " + s.levels.n;
   bars($("bands"), s.levels.bands.map((b) => ({ label: b.band, value: b.runs, sub: fmt(b.pct, "%") })));
   $("n-prog").textContent = "n = " + s.levels.n;
   bars($("progression"), s.progression.filter((p) => p.k <= 40).map((p) => ({ label: "≥ " + p.k, value: p.pct, sub: p.reached })), "%");
-  const abTotal = s.abandon_at.reduce((a, b) => a + b.confirmed, 0);
-  const neTotal = s.abandon_at.reduce((a, b) => a + b.no_end, 0);
-  $("n-ab").textContent = "n = " + abTotal + " partidas";
-  $("n-ne").textContent = "n = " + neTotal + " partidas";
-  bars($("abandon"), s.abandon_at.filter((a) => a.confirmed).slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.confirmed })));
+  const sum = (k) => s.abandon_at.reduce((a, b) => a + b[k], 0);
+  $("n-ab").textContent = "n = " + sum("voluntary") + " partidas";
+  $("n-ex").textContent = "n = " + sum("exit_detected") + " partidas";
+  $("n-ne").textContent = "n = " + sum("no_end") + " partidas";
+  bars($("abandon"), s.abandon_at.filter((a) => a.voluntary).slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.voluntary })));
+  bars($("exits"), s.abandon_at.filter((a) => a.exit_detected).slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.exit_detected })));
   bars($("noend"), s.abandon_at.filter((a) => a.no_end).slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.no_end })));
 
   const cmp = $("compare"); cmp.replaceChildren();
   const box = (title, headers, rows) => { const d = el("div"); d.append(el("h2", title)); table(d, headers, rows); cmp.append(d); };
   const devName = { mobile: "celular", tablet: "tablet", desktop: "computador" };
-  box("Partidas por aparelho", ["Aparelho", "Partidas", "Sem atividade", "Nível médio", "Game Over %", "Abandono confirmado %", "Sem fim %"], c.device.runs.map((x) => [devName[x.key] || x.key, x.runs, x.finished, x.mean_level, x.over_pct, x.abandon_confirmed_pct, x.no_end_pct]));
+  box("Partidas por aparelho", ["Aparelho", "Partidas", "Sem atividade", "Nível médio", "Game Over %", "Abandono voluntário %", "Saída detectada %", "Sem fim %"], c.device.runs.map((x) => [devName[x.key] || x.key, x.runs, x.finished, x.mean_level, x.over_pct, x.voluntary_pct, x.exit_pct, x.no_end_pct]));
   box("Sucesso por aparelho", ["Aparelho", "Tentativas", "Sucesso %"], c.device.results.map((x) => [devName[x.key] || x.key, x.attempts, x.success_pct]));
   box("Sucesso por dificuldade", ["Dificuldade", "Tentativas", "Sucesso %"], c.difficulty.map((x) => ["●".repeat(Number(x.key)) || x.key, x.attempts, x.success_pct]));
   box("Sucesso por tipo", ["Tipo", "Tentativas", "Sucesso %"], c.wtf.map((x) => [x.key === "" ? "normal" : "WTF " + x.key, x.attempts, x.success_pct]));
-  box("Por versão do jogo", ["Versão", "Partidas", "Nível médio", "Game Over %", "Abandono confirmado %", "Sem fim %"], c.version.runs.map((x) => [x.key, x.runs, x.mean_level, x.over_pct, x.abandon_confirmed_pct, x.no_end_pct]));
+  box("Por versão do jogo", ["Versão", "Partidas", "Nível médio", "Game Over %", "Abandono voluntário %", "Saída detectada %", "Sem fim %"], c.version.runs.map((x) => [x.key, x.runs, x.mean_level, x.over_pct, x.voluntary_pct, x.exit_pct, x.no_end_pct]));
   box("Sucesso por versão", ["Versão", "Tentativas", "Sucesso %"], c.version.results.map((x) => [x.key, x.attempts, x.success_pct]));
 
   const rk = m.ranking;

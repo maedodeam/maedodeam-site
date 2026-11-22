@@ -83,8 +83,10 @@ processados = idempotência). Detalhes em `migrations/0001_init.sql`.
   mais final: Game Over > abandono > aberta).
 - **Desfechos de uma partida** (uma partida sem Game Over **não** vira abandono confirmado automaticamente):
   - *Game Over* = evento `game_over`;
-  - *abandono confirmado* = evento `game_abandon` (`quit`: saiu pelo menu; `pagehide`: fechou a página de verdade —
-    se a página só foi para o cache de voltar/avançar, não conta);
+  - *abandono voluntário* = evento `game_abandon` com `quit`: a pessoa saiu pelo menu (escolha explícita de parar);
+  - *saída detectada* = evento `game_abandon` com `pagehide`: a página foi fechada ou trocada no meio da partida
+    (registrado, mas não tratado como decisão de abandonar; se a página só foi para o cache de voltar/avançar,
+    nem conta);
   - *sem fim registrado* = nenhum dos dois e sem eventos há mais de `ABANDON_AFTER_MIN` (30 min, configurável).
     Fica separado do abandono confirmado e se divide em *presumido* (sequência completa) e *falha de envio*
     (lacuna em `seq` ou sem `game_start`);
@@ -112,14 +114,14 @@ Toda métrica mostra o tamanho da amostra. Filtros: período (início da partida
 (estatísticas por microgame) e versão.
 
 - Tudo conta **partidas** (sessões), nunca pessoas: não há identificador de jogador, logo não há "jogadores únicos".
-- Partidas iniciadas; Game Over; abandono confirmado; sem fim registrado (presumido / falha de envio), em número e %.
+- Partidas iniciadas; Game Over; abandono voluntário; saída detectada; sem fim registrado (presumido / falha de envio), em número e %.
 - Nível = microgames concluídos na partida: média, mediana, moda, faixas, curva de progressão (% que chega ao N)
   e onde se abandona.
 - Por microgame (os 300): tentativas, vitórias, derrotas, % de sucesso, partidas distintas, partidas com ao menos
   uma vitória, % médio do tempo usado. Tabela ordenável e filtrável.
 - Ranking das maiores e menores taxas (só com amostra mínima, `RANKING_MIN_ATTEMPTS` = 30).
 - Comparativos por aparelho (celular × tablet × computador), dificuldade, tipo (normal × WTF) e versão.
-- CSV: microgames, partidas (anônimas) e progressão (com proteção contra fórmulas).
+- CSV: microgames, partidas (uma linha por partida, sem identificação pessoal) e progressão (com proteção contra fórmulas).
 
 ## Testar localmente (sem Cloudflare)
 
@@ -138,9 +140,9 @@ A mesma chave (`client.config.json`) liga ou desliga, juntos:
 | --- | --- | --- |
 | coleta no jogo | código removido do bundle | ligada (respeita o botão e DNT/GPC) |
 | CSP da página do jogo | `connect-src 'none'` | só a origem do serviço |
-| aviso na tela inicial | "Nada fica guardado. Fechou a página, sumiu." | "Nada fica no seu aparelho. Usamos métricas anônimas de jogo…" + botão + "Como funciona" |
+| aviso na tela inicial | "Nada fica guardado. Fechou a página, sumiu." | "Coletamos estatísticas de gameplay para equilibrar as fases — sem conta, sem cookies e sem identificação pessoal…" + botão + "Como funciona" |
 | meta description e chamada da home | "nada salvo" / "no saves" | "sem salvar o progresso" / "no save files" |
-| rodapé do site | "Sem rastreadores" | "Métricas anônimas só no jogo" |
+| rodapé do site | "Sem rastreadores" | "Estatísticas de gameplay só no jogo" |
 | `privacy.html` | sem seção do Microgame Mayhem | seção PT/EN com data e retenção da configuração |
 
 Os testes em `tests/site.test.ts` geram as páginas nos dois estados (sem gravar nada) e conferem cada linha.
@@ -202,7 +204,8 @@ O que você precisa autorizar e fazer na Cloudflare, nesta ordem (o `scripts/dep
 
 | verificação | teste |
 | --- | --- |
-| partida sem Game Over não vira abandono confirmado | `stats.test.ts` → "partida sem Game Over e sem evento de abandono NUNCA conta como abandono confirmado" |
+| partida sem Game Over não vira abandono confirmado | `stats.test.ts` → "partida sem Game Over e sem evento de saída NUNCA conta como abandono" |
+| saída detectada ≠ abandono voluntário | `stats.test.ts` → "saída detectada (fechou a página) separada do abandono voluntário (saiu pelo menu)" |
 | dashboard e todos os endpoints exigem autenticação válida | `dashboard.test.ts` → "sem token: 403 em todas as rotas…", "endereços alternativos e outros métodos…", "tokens adulterados…", "falha fechada" |
 | processamento idempotente | `ingest.test.ts` → "o mesmo lote enviado duas vezes…", "dois lotes iguais chegando ao mesmo tempo…", "ordem de chegada não importa…" |
 | jogo funciona com a telemetria fora do ar | `telemetry-client.test.ts` → "serviço fora do ar…"; validado também à mão com o servidor local derrubado (partida inteira até o Game Over) |

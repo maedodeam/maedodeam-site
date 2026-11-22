@@ -1,9 +1,14 @@
-# Roteiro GUIADO de publicação da telemetria na Cloudflare. Não roda nada sem você confirmar cada passo.
-# Uso (PowerShell, na raiz do repositório):  .\telemetry\scripts\deploy.ps1
-# Antes: leia telemetry/README.md ("Ativação"). Nada aqui altera o jogo publicado nem DNS de maedodeam.com.br.
+# Roteiro GUIADO de publicação da telemetria na Cloudflare. Nada roda sem você confirmar cada passo.
+# Uso (PowerShell, na raiz do repositório):
+#   .\telemetry\scripts\deploy.ps1 -Env staging      # ambiente de TESTE (banco e Workers "-staging")
+#   .\telemetry\scripts\deploy.ps1 -Env production   # ambiente FINAL (só depois do teste validado)
+# Nada aqui liga a coleta no jogo, altera o site publicado nem mexe em DNS de maedodeam.com.br.
+param([ValidateSet("staging", "production")][string]$Env = "staging")
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $wrangler = "npx --yes wrangler@4"
+$envFlag = if ($Env -eq "staging") { "--env staging" } else { "" }
+$db = if ($Env -eq "staging") { "mm-telemetry-staging" } else { "mm-telemetry" }
 
 function Step($title, $detail, [scriptblock]$action) {
   Write-Host ""
@@ -12,40 +17,42 @@ function Step($title, $detail, [scriptblock]$action) {
   $ok = Read-Host "Executar agora? (s/N)"
   if ($ok -eq "s") { & $action } else { Write-Host "pulado." }
 }
-
-Step "1. Login na Cloudflare" "Abre o navegador para você entrar na sua conta (o login é seu)." {
-  Invoke-Expression "$wrangler login"
+function InDir($dir, $cmd) {
+  Push-Location (Join-Path $root $dir)
+  try { Invoke-Expression $cmd } finally { Pop-Location }
 }
 
-Step "2. Criar o banco D1 'mm-telemetry'" "Depois, copie o database_id mostrado para telemetry/ingest/wrangler.toml e telemetry/dashboard/wrangler.toml." {
-  Invoke-Expression "$wrangler d1 create mm-telemetry"
+Write-Host "Ambiente: $Env  (banco $db)" -ForegroundColor Cyan
+
+Step "1. Conferir o login" "Mostra a conta conectada (o login, se precisar, é você quem faz: $wrangler login)." {
+  Invoke-Expression "$wrangler whoami"
 }
 
-Step "3. Aplicar o esquema (migrations) no D1 remoto" "Cria as tabelas runs, results, life_changes e seen_events." {
-  Push-Location (Join-Path $root "telemetry\ingest")
-  try { Invoke-Expression "$wrangler d1 migrations apply mm-telemetry --remote" } finally { Pop-Location }
+Step "2. Criar o banco D1 '$db'" "Depois, copie o database_id mostrado para os DOIS wrangler.toml (seção do ambiente $Env)." {
+  Invoke-Expression "$wrangler d1 create $db"
 }
 
-Step "4. Publicar o Worker PÚBLICO de ingestão" "Cria https://mm-telemetry-ingest.<subdominio>.workers.dev (só POST /v1/events), o cron de retenção e o limitador." {
-  Push-Location (Join-Path $root "telemetry\ingest")
-  try { Invoke-Expression "$wrangler deploy" } finally { Pop-Location }
+Step "3. Criar as tabelas (migrations) no D1 remoto" "Aplica telemetry/migrations no banco $db." {
+  InDir "telemetry\ingest" "$wrangler d1 migrations apply $db --remote $envFlag"
 }
 
-Step "5. Guardar os e-mails autorizados (secret do dashboard)" "Digite o(s) e-mail(s) quando o wrangler pedir. Fica só na Cloudflare, não no repositório." {
-  Push-Location (Join-Path $root "telemetry\dashboard")
-  try { Invoke-Expression "$wrangler secret put ALLOWED_EMAILS" } finally { Pop-Location }
+Step "4. Publicar o Worker PÚBLICO de ingestão" "Só POST /v1/events. Endereço: https://mm-telemetry-ingest$(if ($Env -eq 'staging') {'-staging'}).<subdominio>.workers.dev" {
+  InDir "telemetry\ingest" "$wrangler deploy $envFlag"
 }
 
-Step "6. Publicar o Worker PRIVADO do dashboard" "Antes: ACCESS_TEAM_DOMAIN preenchido no wrangler.toml. Sem o Access configurado, o Worker nega tudo (falha fechada)." {
-  Push-Location (Join-Path $root "telemetry\dashboard")
-  try { Invoke-Expression "$wrangler deploy" } finally { Pop-Location }
+Step "5. Guardar o(s) e-mail(s) autorizado(s) no dashboard (secret)" "O wrangler pede o valor; ele fica só na Cloudflare, nunca no repositório." {
+  InDir "telemetry\dashboard" "$wrangler secret put ALLOWED_EMAILS $envFlag"
+}
+
+Step "6. Publicar o Worker PRIVADO do dashboard" "Sem ACCESS_TEAM_DOMAIN/ACCESS_AUD preenchidos, ele nega tudo (falha fechada) — é seguro publicar antes do Access." {
+  InDir "telemetry\dashboard" "$wrangler deploy $envFlag"
 }
 
 Write-Host ""
-Write-Host "Agora, no painel da Cloudflare:" -ForegroundColor Cyan
-Write-Host " - Workers > mm-telemetry-dashboard > Settings > Domains & Routes > workers.dev > ligar Cloudflare Access"
-Write-Host " - Zero Trust > Access > Applications: política Allow só para o seu e-mail; copiar o AUD para ACCESS_AUD"
-Write-Host " - Preview URLs desligado nos dois Workers"
-Write-Host " - Publicar o dashboard de novo (passo 6) depois de preencher ACCESS_AUD"
+Write-Host "No painel da Cloudflare (você):" -ForegroundColor Cyan
+Write-Host " a) Workers & Pages > mm-telemetry-dashboard$(if ($Env -eq 'staging') {'-staging'}) > Access > 'Protect this Worker behind Access' > All traffic"
+Write-Host " b) Zero Trust > Access > Applications > (a aplicação criada) > política: Allow, Include 'Emails' = o seu e-mail"
+Write-Host " c) Copie o 'Application Audience (AUD) Tag' para ACCESS_AUD e o team domain para ACCESS_TEAM_DOMAIN (wrangler.toml, seção $Env)"
+Write-Host " d) Rode o passo 6 de novo"
 Write-Host ""
-Write-Host "Ligar no jogo (só com autorização): telemetry/client.config.json -> endpoint; política de privacidade; npm run build; testes; commit; push."
+Write-Host "Validar: node telemetry/scripts/validate-remote.mjs --ingest <url da ingestão> --dashboard <url do dashboard>"

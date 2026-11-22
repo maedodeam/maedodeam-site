@@ -26,3 +26,26 @@ ACCESS_AUD = "COLE_AQUI_O_AUD"
 ABANDON_AFTER_MIN = "30"
 RANKING_MIN_ATTEMPTS = "30"
 # ALLOWED_EMAILS NÃO fica aqui (o repositório é público): npx wrangler secret put ALLOWED_EMAILS
+
+# ---------------------------------------------------------------------------------------------------------------
+# AMBIENTE DE TESTE (staging): lê o banco de teste. Também atrás do Access (aplicação própria → AUD próprio).
+# Publicar: npx wrangler deploy --env staging   ·   Secret: npx wrangler secret put ALLOWED_EMAILS --env staging
+[env.staging]
+name = "mm-telemetry-dashboard-staging"
+workers_dev = true
+preview_urls = false
+
+[env.staging.observability]
+enabled = false
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "mm-telemetry-staging"
+database_id = "COLE_AQUI_O_ID_DO_D1_DE_TESTE"
+migrations_dir = "../migrations"
+
+[env.staging.vars]
+ACCESS_TEAM_DOMAIN = "COLE_AQUI.cloudflareaccess.com"
+ACCESS_AUD = "COLE_AQUI_O_AUD_DO_DASHBOARD_DE_TESTE"
+ABANDON_AFTER_MIN = "5"        # curto no teste, para ver "sem fim registrado" sem esperar 30 min
+RANKING_MIN_ATTEMPTS = "1"

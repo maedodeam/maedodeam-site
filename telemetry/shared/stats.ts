@@ -6,7 +6,9 @@
 // - "nível" de uma partida = quantos microgames ela concluiu (max_n; 0 = saiu durante o primeiro).
 // - Desfechos (mutuamente exclusivos):
 //   · Game Over: evento game_over recebido;
-//   · abandono CONFIRMADO: evento game_abandon recebido (saiu pelo menu, ou fechou a página de verdade);
+//   · ABANDONO VOLUNTÁRIO: evento game_abandon "quit" — a pessoa saiu pelo menu (escolha explícita de parar);
+//   · SAÍDA DETECTADA: evento game_abandon "pagehide" — a página foi fechada/trocada no meio da partida. Registrada,
+//     mas não é tratada como decisão de abandonar (pode ser a aba fechada sem querer, o celular trocando de app…);
 //   · SEM FIM REGISTRADO: nenhum dos dois e nenhum evento há mais de `abandonAfterMin` minutos. NÃO é abandono
 //     confirmado; divide-se em "presumido" (sequência completa: provavelmente parou sem o navegador avisar) e
 //     "falha de envio" (faltam eventos ou o game_start: provável problema de comunicação);
@@ -128,11 +130,13 @@ export async function summary(db: D1Database, f: Filters) {
   // em que microgame as partidas terminam sem Game Over: abandono confirmado x sem fim registrado
   const abandonRows = await db
     .prepare(
-      `SELECT max_n AS n, coalesce(sum(status = 'abandoned'), 0) AS confirmed, coalesce(sum(${open} AND last_seen_at < ?), 0) AS no_end
+      `SELECT max_n AS n, coalesce(sum(status = 'abandoned' AND abandon_reason = 'quit'), 0) AS voluntary,
+              coalesce(sum(status = 'abandoned' AND coalesce(abandon_reason, '') <> 'quit'), 0) AS exit_detected,
+              coalesce(sum(${open} AND last_seen_at < ?), 0) AS no_end
        FROM runs ${w.sql ? w.sql + " AND" : "WHERE"} (status = 'abandoned' OR (${open} AND last_seen_at < ?)) GROUP BY max_n ORDER BY max_n`,
     )
     .bind(cut, ...w.args, cut)
-    .all<{ n: number; confirmed: number; no_end: number }>();
+    .all<{ n: number; voluntary: number; exit_detected: number; no_end: number }>();
 
   return {
     runs: {
@@ -140,7 +144,8 @@ export async function summary(db: D1Database, f: Filters) {
       finished,
       in_progress: r.in_progress ?? 0,
       game_over: { n: r.over ?? 0, pct: pct(r.over ?? 0, finished) },
-      abandoned_confirmed: { n: r.detected ?? 0, pct: pct(r.detected ?? 0, finished), quit: r.detected_quit ?? 0, pagehide: r.detected_pagehide ?? 0 },
+      abandon_voluntary: { n: r.detected_quit ?? 0, pct: pct(r.detected_quit ?? 0, finished) },
+      exit_detected: { n: r.detected_pagehide ?? 0, pct: pct(r.detected_pagehide ?? 0, finished) },
       no_end: { n: noEnd, pct: pct(noEnd, finished) },
       no_end_presumed: { n: r.presumed ?? 0, pct: pct(r.presumed ?? 0, finished) },
       no_end_comm: { n: r.incomplete ?? 0, pct: pct(r.incomplete ?? 0, finished) },
@@ -149,7 +154,7 @@ export async function summary(db: D1Database, f: Filters) {
     },
     levels: { ...levels, bands },
     progression,
-    abandon_at: abandonRows.results.map((x) => ({ n: x.n, confirmed: x.confirmed, no_end: x.no_end })),
+    abandon_at: abandonRows.results.map((x) => ({ n: x.n, voluntary: x.voluntary, exit_detected: x.exit_detected, no_end: x.no_end })),
     sample: { runs: total, finished_runs: finished, unit: "partidas (não jogadores)" },
     abandon_after_min: f.abandonAfterMin,
   };
@@ -211,14 +216,15 @@ export async function compare(db: D1Database, f: Filters) {
         .prepare(
           `SELECT coalesce(${col}, '?') AS key, count(*) AS runs,
                   coalesce(sum(status = 'over'), 0) AS over,
-                  coalesce(sum(status = 'abandoned'), 0) AS abandoned,
+                  coalesce(sum(status = 'abandoned' AND abandon_reason = 'quit'), 0) AS voluntary,
+                  coalesce(sum(status = 'abandoned' AND coalesce(abandon_reason, '') <> 'quit'), 0) AS exits,
                   coalesce(sum(status = 'open' AND last_seen_at < ?), 0) AS no_end,
                   coalesce(sum(status = 'open' AND last_seen_at >= ?), 0) AS in_progress,
                   avg(CASE WHEN NOT (status = 'open' AND last_seen_at >= ?) THEN max_n END) AS mean_level
            FROM runs ${w.sql} GROUP BY ${col} ORDER BY runs DESC LIMIT 50`,
         )
         .bind(cut, cut, cut, ...w.args)
-        .all<{ key: string; runs: number; over: number; abandoned: number; no_end: number; in_progress: number; mean_level: number | null }>()
+        .all<{ key: string; runs: number; over: number; voluntary: number; exits: number; no_end: number; in_progress: number; mean_level: number | null }>()
     ).results.map((x) => {
       const finished = x.runs - x.in_progress;
       return {
@@ -226,7 +232,8 @@ export async function compare(db: D1Database, f: Filters) {
         runs: x.runs,
         finished,
         over_pct: pct(x.over, finished),
-        abandon_confirmed_pct: pct(x.abandoned, finished),
+        voluntary_pct: pct(x.voluntary, finished),
+        exit_pct: pct(x.exits, finished),
         no_end_pct: pct(x.no_end, finished),
         mean_level: x.mean_level != null ? Math.round(x.mean_level * 100) / 100 : null,
       };

@@ -192,7 +192,7 @@
     "seq1": "Idea",
     "seq2": "Software",
     "seq3": "Product",
-    "stamp_telemetry": "Static HTML · No cookies · Anonymous metrics in the game only"
+    "stamp_telemetry": "Static HTML · No cookies · Gameplay stats in the game only"
   },
   "support": {
     "label": "Support",
@@ -222,7 +222,7 @@
     "play": "PLAY",
     "controls": "Mouse, keyboard or touch. Each game tells you how.",
     "note": "Nothing is stored. Close the page and it's gone.",
-    "note_telemetry": "Nothing is kept on your device. We use anonymous gameplay metrics to balance the microgames.",
+    "note_telemetry": "We collect gameplay statistics to balance the microgames — no account, no cookies and no personal identification. Nothing is kept on your device.",
     "canvas_label": "Microgame Mayhem game area",
     "noscript": "Microgame Mayhem needs JavaScript to run.",
     "pause": "Pause",
@@ -246,9 +246,9 @@
     "cta_meta": "Browser game · Desktop & mobile · No sign-up",
     "cta_verbs": "SWAT! · DODGE! · POUR! · SLICE! · JUMP! · REPEAT! · FILE IT! · SOLVE! · HOLD IT! · DON'T TOUCH! · ",
     "meta_description_telemetry": "300 tiny games, 4 lives, no save files. A fast, silly microgame marathon made by MAEDODEAM. Plays in the browser on desktop and mobile.",
-    "metrics_on": "Gameplay metrics: on · turn off",
-    "metrics_off": "Gameplay metrics: off · turn on",
-    "metrics_browser": "Metrics turned off by your browser",
+    "metrics_on": "Gameplay stats: on · turn off",
+    "metrics_off": "Gameplay stats: off · turn on",
+    "metrics_browser": "Gameplay stats turned off by your browser",
     "metrics_hint": "Lasts until you close the page. To turn them off for good, enable Global Privacy Control or Do Not Track in your browser.",
     "metrics_more": "How it works",
     "cta_text_telemetry": "300 tiny games built in-house. Four lives, no save files, and each game lasts about as long as your attention span. Works with mouse, keyboard or touch."

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | Controladora | MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA |
-| Tratamento | métricas anônimas de partida do Microgame Mayhem (maedodeam.com.br/play) |
+| Tratamento | estatísticas de gameplay do Microgame Mayhem (maedodeam.com.br/play), sem conta, cookies ou identificação pessoal |
 | Base legal avaliada | legítimo interesse — LGPD art. 7º, IX, e art. 10 |
 | Operadora | Cloudflare (Workers e D1) |
 | Versão | 1 — preparada antes da ativação; revisar antes de publicar e a cada mudança no que é coletado |
@@ -56,8 +56,8 @@ do jogo e entender em que ponto as partidas terminam.
 ### Expectativa razoável
 
 - Métricas de uso para melhorar um jogo são uma prática comum e esperada em jogos online.
-- Há aviso **na própria tela inicial do jogo**, antes de jogar ("Usamos métricas anônimas de jogo para equilibrar
-  as fases"), com link para a política — não só na política.
+- Há aviso **na própria tela inicial do jogo**, antes de jogar ("Coletamos estatísticas de gameplay para equilibrar
+  as fases — sem conta, sem cookies e sem identificação pessoal"), com botão para desligar e link para a política.
 - O aviso antigo ("Nada fica guardado. Fechou a página, sumiu.") e os textos do site que diziam "nada salvo" ou
   "sem rastreadores" mudam automaticamente junto com a ativação, para não criar expectativa errada.
 
@@ -80,7 +80,7 @@ do jogo e entender em que ponto as partidas terminam.
 | **Opção de desligar** na tela inicial, sem tirar nada do jogo; vale até fechar a página (o jogo não guarda nada no aparelho, então não pode lembrar a escolha) | botão `#mm-metrics`; teste "botão da tela inicial: desligar para na hora…" |
 | **Desligar sempre:** Do Not Track ou Global Privacy Control fazem o jogo não enviar nada | teste "Do Not Track / Global Privacy Control: nada é enviado" e "com DNT/GPC, o botão não consegue ligar" |
 | Transparência: aviso no jogo + seção própria na política (PT e EN), publicados **junto** com a coleta | a mesma chave liga tudo; teste "ligada: a política ganha a seção…" e "configuração atual: telemetria desligada…" |
-| Minimização e anonimato: sem IP, user-agent, e-mail, localização no banco | teste "limite de requisições por IP (o IP não vai para o banco)" (inspeciona o esquema) |
+| Minimização: sem IP, user-agent, e-mail, localização ou identificador persistente no banco | teste "limite de requisições por IP (o IP não vai para o banco)" (inspeciona o esquema) |
 | Sem armazenamento no aparelho | testes de privacidade do jogo (código e bundle) e e2e "sem rede e sem armazenamento" |
 | Partidas não são pessoas: o dashboard nunca mostra "jogadores únicos" | teste "dashboard: partidas não são jogadores" |
 | Retenção limitada e automática | `retentionDays()` (30–400), cron diário; teste "a retenção do Worker é a mesma da política" |

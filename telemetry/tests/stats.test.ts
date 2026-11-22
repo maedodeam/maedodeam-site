@@ -42,17 +42,15 @@ async function scenario() {
 const F0: Filters = { abandonAfterMin: 30, now: NOW };
 
 describe("estatísticas", () => {
-  test("partidas: iniciadas, Game Over, abandono confirmado, sem fim registrado (presumido × falha de envio), em andamento", async () => {
+  test("partidas: iniciadas, Game Over, abandono voluntário, saída detectada, sem fim registrado (presumido × falha de envio), em andamento", async () => {
     const env = await scenario();
     const s = await summary(env.DB, F0);
     assert.equal(s.runs.total, 7);
     assert.equal(s.runs.in_progress, 1);
     assert.equal(s.runs.finished, 6);
     assert.equal(s.runs.game_over.n, 2);
-    assert.equal(s.runs.abandoned_confirmed.n, 2);
-    assert.equal(s.runs.abandoned_confirmed.quit, 1);
-    assert.equal(s.runs.abandoned_confirmed.pagehide, 1);
-    assert.equal(s.runs.abandoned_confirmed.pct, 33.3, "só os 2 com evento de abandono (de 6)");
+    assert.deepEqual(s.runs.abandon_voluntary, { n: 1, pct: 16.7 }, "só quem saiu pelo menu");
+    assert.deepEqual(s.runs.exit_detected, { n: 1, pct: 16.7 }, "fechou a página: saída detectada, não abandono voluntário");
     assert.equal(s.runs.no_end.n, 2);
     assert.equal(s.runs.no_end_presumed.n, 1);
     assert.equal(s.runs.no_end_comm.n, 1);
@@ -60,15 +58,17 @@ describe("estatísticas", () => {
     assert.equal(s.sample.unit, "partidas (não jogadores)");
   });
 
-  test("partida sem Game Over e sem evento de abandono NUNCA conta como abandono confirmado", async () => {
+  test("partida sem Game Over e sem evento de saída NUNCA conta como abandono", async () => {
     const env = ingestEnv();
     const R = new FakeRun();
     await send(env, [R.start(), R.result(1, "swat-fly", "win")], NOW - 5 * 24 * 60 * MIN);
     const s = await summary(env.DB, F0);
-    assert.equal(s.runs.abandoned_confirmed.n, 0);
+    assert.equal(s.runs.abandon_voluntary.n, 0);
+    assert.equal(s.runs.exit_detected.n, 0);
     assert.equal(s.runs.no_end.n, 1);
     const c = await compare(env.DB, F0);
-    assert.equal(c.device.runs[0].abandon_confirmed_pct, 0);
+    assert.equal(c.device.runs[0].voluntary_pct, 0);
+    assert.equal(c.device.runs[0].exit_pct, 0);
     assert.equal(c.device.runs[0].no_end_pct, 100);
   });
 
@@ -85,9 +85,24 @@ describe("estatísticas", () => {
     assert.deepEqual(s.progression.find((p) => p.k === 4), { k: 4, reached: 1, pct: 16.7 });
     assert.deepEqual(s.progression.find((p) => p.k === 3), { k: 3, reached: 5, pct: 83.3 });
     assert.deepEqual(s.abandon_at, [
-      { n: 2, confirmed: 1, no_end: 0 },
-      { n: 3, confirmed: 1, no_end: 2 },
+      { n: 2, voluntary: 1, exit_detected: 0, no_end: 0 },
+      { n: 3, voluntary: 0, exit_detected: 1, no_end: 2 },
     ]);
+  });
+
+  test("saída detectada (fechou a página) separada do abandono voluntário (saiu pelo menu)", async () => {
+    const env = ingestEnv();
+    const Q = new FakeRun();
+    const P1 = new FakeRun();
+    const P2 = new FakeRun();
+    await send(env, [Q.start(), Q.result(1, "swat-fly", "win"), Q.abandon(1, "quit")], NOW - 10 * MIN);
+    await send(env, [P1.start(), P1.abandon(0, "pagehide")], NOW - 10 * MIN);
+    await send(env, [P2.start(), P2.result(1, "swat-fly", "lose", 3), P2.abandon(1, "pagehide")], NOW - 10 * MIN);
+    const s = await summary(env.DB, F0);
+    assert.equal(s.runs.abandon_voluntary.n, 1);
+    assert.equal(s.runs.exit_detected.n, 2);
+    const c = await compare(env.DB, F0);
+    assert.deepEqual({ v: c.device.runs[0].voluntary_pct, e: c.device.runs[0].exit_pct }, { v: 33.3, e: 66.7 });
   });
 
   test("média, mediana (par e ímpar) e moda (empate fica com o menor)", () => {
@@ -135,8 +150,8 @@ describe("estatísticas", () => {
     const c = await compare(env.DB, F0);
     const mobile = c.device.runs.find((x) => x.key === "mobile")!;
     assert.deepEqual(
-      { runs: mobile.runs, finished: mobile.finished, confirmed: mobile.abandon_confirmed_pct, noEnd: mobile.no_end_pct, over: mobile.over_pct },
-      { runs: 3, finished: 3, confirmed: 66.7, noEnd: 0, over: 33.3 },
+      { runs: mobile.runs, finished: mobile.finished, voluntary: mobile.voluntary_pct, exit: mobile.exit_pct, noEnd: mobile.no_end_pct, over: mobile.over_pct },
+      { runs: 3, finished: 3, voluntary: 33.3, exit: 33.3, noEnd: 0, over: 33.3 },
     );
     assert.ok(c.difficulty.length >= 1);
     assert.deepEqual(c.version.runs.map((x) => x.key).sort(), ["v1", "v2"]);

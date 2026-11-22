@@ -10,6 +10,10 @@ const migrations = join(dirname(fileURLToPath(import.meta.url)), "..", "migratio
 
 type Value = string | number | null;
 
+/** Limites reais do D1 (developers.cloudflare.com/d1/platform/limits): passar deles falha também aqui. */
+export const D1_MAX_PARAMS = 100;
+export const D1_MAX_QUERIES_FREE = 50;
+
 class Stmt implements D1PreparedStatement {
   private readonly db: DatabaseSync;
   readonly sql: string;
@@ -20,6 +24,7 @@ class Stmt implements D1PreparedStatement {
     this.params = params;
   }
   bind(...values: unknown[]): D1PreparedStatement {
+    if (values.length > D1_MAX_PARAMS) throw new Error(`D1: ${values.length} parâmetros (máximo ${D1_MAX_PARAMS})`);
     return new Stmt(
       this.db,
       this.sql,
@@ -27,18 +32,26 @@ class Stmt implements D1PreparedStatement {
     );
   }
   async run(): Promise<D1Result> {
+    SqliteD1.count();
     const r = this.db.prepare(this.sql).run(...this.params);
     return { results: [], success: true, meta: { changes: Number(r.changes) } };
   }
   async all<T>(): Promise<D1Result<T>> {
+    SqliteD1.count();
     return { results: this.db.prepare(this.sql).all(...this.params) as T[], success: true };
   }
   async first<T>(): Promise<T | null> {
+    SqliteD1.count();
     return (this.db.prepare(this.sql).get(...this.params) as T | undefined) ?? null;
   }
 }
 
 export class SqliteD1 implements D1Database {
+  /** Consultas feitas desde o último reset (cada db.batch conta 1, como no D1). */
+  static queries = 0;
+  static count(): void {
+    SqliteD1.queries++;
+  }
   readonly raw: DatabaseSync;
   constructor(file = ":memory:") {
     this.raw = new DatabaseSync(file);
@@ -49,6 +62,7 @@ export class SqliteD1 implements D1Database {
   }
   /** Como no D1: tudo numa transação, executada de uma vez (sem intercalar com outro lote); se um comando falhar, nada fica. */
   async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
+    SqliteD1.count();
     const out: D1Result[] = [];
     this.raw.exec("BEGIN");
     try {

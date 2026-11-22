@@ -31,3 +31,33 @@ simple = { limit = 120, period = 60 }
 # Retenção: apaga as métricas com mais de RETENTION_DAYS dias (30–400), todo dia às 03:17 UTC.
 [triggers]
 crons = ["17 3 * * *"]
+
+# ---------------------------------------------------------------------------------------------------------------
+# AMBIENTE DE TESTE (staging): Worker e banco separados, aceitando só o jogo rodando local (127.0.0.1:8765).
+# Publicar: npx wrangler deploy --env staging   ·   Os dados de teste nunca se misturam com os de produção.
+[env.staging]
+name = "mm-telemetry-ingest-staging"
+workers_dev = true
+preview_urls = false
+
+[env.staging.observability]
+enabled = false
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "mm-telemetry-staging"
+database_id = "COLE_AQUI_O_ID_DO_D1_DE_TESTE"   # saída de: npx wrangler d1 create mm-telemetry-staging
+migrations_dir = "../migrations"
+
+[env.staging.vars]
+ALLOWED_ORIGINS = "http://127.0.0.1:8765,http://localhost:8765"
+RETENTION_DAYS = "180"
+
+[[env.staging.ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 120, period = 60 }
+
+# sem cron no teste (o plano gratuito tem 5 crons por conta)
+[env.staging.triggers]
+crons = []

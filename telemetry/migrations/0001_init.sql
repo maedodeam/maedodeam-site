@@ -1,6 +1,10 @@
 -- Telemetria do Microgame Mayhem — esquema D1 (SQLite).
 -- Nada aqui identifica pessoas: run_id é um UUID aleatório por partida, criado em memória no navegador.
 -- Sem IP, sem user-agent, sem localização. Horários são do servidor (ms desde 1970), na chegada do evento.
+--
+-- Custo no plano gratuito do D1 (100 mil linhas escritas por dia): cada índice custa uma linha a mais por escrita.
+-- Por isso as tabelas de chave UUID são WITHOUT ROWID (a chave é a própria tabela: 1 escrita, não 2) e só existem
+-- os índices que alguma consulta usa.
 
 -- Uma linha por partida. Os campos são atualizados de forma idempotente (máximos e prioridades),
 -- então eventos repetidos ou fora de ordem não estragam o resultado.
@@ -19,7 +23,7 @@ CREATE TABLE IF NOT EXISTS runs (
   wins          INTEGER,
   events        INTEGER NOT NULL DEFAULT 0,   -- eventos distintos recebidos
   max_seq       INTEGER NOT NULL DEFAULT -1   -- maior número de sequência visto (lacunas = eventos perdidos)
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS runs_started ON runs (started_at);
 CREATE INDEX IF NOT EXISTS runs_status ON runs (status, last_seen_at);
 
@@ -42,7 +46,7 @@ CREATE TABLE IF NOT EXISTS results (
   input       TEXT    NOT NULL,               -- mouse | touch | keys
   device      TEXT,                           -- copiado da partida, para filtrar sem JOIN
   version     TEXT
-);
+) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS results_mg ON results (mg);
 CREATE INDEX IF NOT EXISTS results_run ON results (run_id);
 CREATE INDEX IF NOT EXISTS results_time ON results (received_at);
@@ -56,8 +60,7 @@ CREATE TABLE IF NOT EXISTS life_changes (
   from_lives  INTEGER NOT NULL,
   to_lives    INTEGER NOT NULL,
   reason      TEXT    NOT NULL CHECK (reason IN ('lose', 'milestone'))
-);
-CREATE INDEX IF NOT EXISTS life_run ON life_changes (run_id);
+) WITHOUT ROWID;
 
 -- Todos os ids de evento já processados: garante idempotência (o mesmo evento duas vezes conta uma vez).
 CREATE TABLE IF NOT EXISTS seen_events (
@@ -65,5 +68,6 @@ CREATE TABLE IF NOT EXISTS seen_events (
   run_id      TEXT    NOT NULL,
   type        TEXT    NOT NULL,
   received_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS seen_time ON seen_events (received_at);
+) WITHOUT ROWID;
+-- a contagem de eventos por partida (store.ts) consulta por run_id
+CREATE INDEX IF NOT EXISTS seen_run ON seen_events (run_id);
