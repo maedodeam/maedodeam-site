@@ -32,7 +32,8 @@ const dev = process.argv.includes("--dev");
 }
 
 // Telemetria (opcional): telemetry/client.config.json. Endpoint vazio = sem telemetria; o módulo nem entra no bundle.
-const teleCfg = JSON.parse(readFileSync(join(root, "telemetry/client.config.json"), "utf8")) as { endpoint?: string };
+// TELEMETRY_CONFIG aponta outro arquivo (ex.: teste local contra o ambiente de staging), igual ao src/build.py.
+const teleCfg = JSON.parse(readFileSync(process.env.TELEMETRY_CONFIG || join(root, "telemetry/client.config.json"), "utf8")) as { endpoint?: string };
 const TELEMETRY_URL = (teleCfg.endpoint ?? "").trim();
 if (TELEMETRY_URL && !/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(TELEMETRY_URL) && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(TELEMETRY_URL)) {
   console.error(`ERRO: endpoint de telemetria inválido: ${TELEMETRY_URL} (precisa ser https://...)`);

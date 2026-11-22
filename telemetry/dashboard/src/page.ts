@@ -229,6 +229,9 @@ async function loadVersions() {
 }
 form.addEventListener("submit", (e) => { e.preventDefault(); load().catch((err) => alert("Erro ao carregar: " + err.message)); });
 $("mg-filter").addEventListener("input", renderMg);
+// Abre nos últimos 7 dias: sem período, cada carga lê as tabelas inteiras (o D1 gratuito lê 5 milhões de linhas/dia).
+const fromInput = form.elements.namedItem("from");
+if (!fromInput.value) fromInput.value = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
 loadVersions();
 load().catch((err) => alert("Erro ao carregar: " + err.message));
 `;

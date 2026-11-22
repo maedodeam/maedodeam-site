@@ -22,8 +22,9 @@ export interface Env {
 }
 
 const PATH = "/v1/events";
-/** Limitador de reserva, em memória (por isolate), caso o binding não exista. */
-const FALLBACK_LIMIT = 120; // requisições por minuto por IP
+/** Limitador em memória (por isolate), somado ao binding da Cloudflare. */
+const FALLBACK_LIMIT = 60; // requisições por janela, por IP (igual ao binding no wrangler.toml)
+const WINDOW_MS = 10_000;
 const memory = new Map<string, { count: number; reset: number }>();
 
 function baseHeaders(): Record<string, string> {
@@ -51,21 +52,27 @@ function allowedOrigin(req: Request, env: Env): string | null {
   return list.includes(origin) ? origin : null;
 }
 
+/**
+ * Duas camadas, ambas precisam aprovar: o binding da Cloudflare (aproximado, contado por local e com
+ * consistência eventual — com janela de 60s deixou passar 180 seguidas; com 10s segurou) e um contador em memória
+ * por isolate, que pega rajadas de um mesmo cliente com precisão.
+ */
 async function underLimit(req: Request, env: Env, now: number): Promise<boolean> {
   const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
+  let slot = memory.get(ip);
+  if (!slot || slot.reset <= now) {
+    if (memory.size > 10000) memory.clear();
+    slot = { count: 0, reset: now + WINDOW_MS };
+    memory.set(ip, slot);
+  }
+  slot.count++;
+  if (slot.count > FALLBACK_LIMIT) return false;
   try {
     if (env.RATE_LIMITER) return (await env.RATE_LIMITER.limit({ key: ip })).success;
   } catch {
-    /* sem o binding, usa o de reserva */
+    /* binding indisponível: vale só o contador em memória */
   }
-  const slot = memory.get(ip);
-  if (!slot || slot.reset <= now) {
-    if (memory.size > 10000) memory.clear();
-    memory.set(ip, { count: 1, reset: now + 60_000 });
-    return true;
-  }
-  slot.count++;
-  return slot.count <= FALLBACK_LIMIT;
+  return true;
 }
 
 /** Retenção efetiva, sempre entre 30 e 400 dias (padrão 180). */
@@ -93,7 +100,7 @@ export async function handle(req: Request, env: Env, now = Date.now()): Promise<
   if (!type.startsWith("text/plain") && !type.startsWith("application/json")) return reply(415, origin);
   const len = Number(req.headers.get("content-length") ?? "0");
   if (len > MAX_BODY_BYTES) return reply(413, origin);
-  if (!(await underLimit(req, env, now))) return reply(429, origin, { "retry-after": "60" });
+  if (!(await underLimit(req, env, now))) return reply(429, origin, { "retry-after": "10" });
 
   let text: string;
   try {

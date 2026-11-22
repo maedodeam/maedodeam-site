@@ -26,7 +26,7 @@ RETENTION_DAYS = "180"   # igual a retention_days em telemetry/client.config.jso
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"
-simple = { limit = 120, period = 60 }
+simple = { limit = 60, period = 10 }   # por IP e por local da Cloudflare; janela de 10s reage a rajadas (a de 60s não reagiu no teste)
 
 # Retenção: apaga as métricas com mais de RETENTION_DAYS dias (30–400), todo dia às 03:17 UTC.
 [triggers]
@@ -46,7 +46,7 @@ enabled = false
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "mm-telemetry-staging"
-database_id = "COLE_AQUI_O_ID_DO_D1_DE_TESTE"   # saída de: npx wrangler d1 create mm-telemetry-staging
+database_id = "dcb96219-cf94-4d3a-9926-1faa910d1f19"   # saída de: npx wrangler d1 create mm-telemetry-staging
 migrations_dir = "../migrations"
 
 [env.staging.vars]
@@ -56,7 +56,7 @@ RETENTION_DAYS = "180"
 [[env.staging.ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1002"
-simple = { limit = 120, period = 60 }
+simple = { limit = 60, period = 10 }   # por IP e por local da Cloudflare; janela de 10s reage a rajadas (a de 60s não reagiu no teste)
 
 # sem cron no teste (o plano gratuito tem 5 crons por conta)
 [env.staging.triggers]

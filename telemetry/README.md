@@ -150,7 +150,7 @@ Os testes em `tests/site.test.ts` geram as páginas nos dois estados (sem gravar
 ## Segurança — resumo
 
 - Ingestão: só `POST /v1/events`; CORS só para `https://maedodeam.com.br` (não é autenticação); corpo ≤ 32 KB;
-  ≤ 30 eventos; validação estrita; limite por IP (120/min, limitador da Cloudflare; o IP não vai para o banco);
+  ≤ 30 eventos; validação estrita; limite por IP (60 a cada 10 s, limitador da Cloudflare + contador em memória; o IP não vai para o banco);
   limite de eventos por partida; respostas sem dados (204 ou código genérico).
 - Eventos podem ser falsificados por quem quiser: os números são estatísticas de comportamento, não contabilidade.
   As defesas acima limitam o estrago (lixo validado e com teto), e o ranking exige amostra mínima.

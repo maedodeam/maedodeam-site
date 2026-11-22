@@ -41,11 +41,11 @@ enabled = false
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "mm-telemetry-staging"
-database_id = "COLE_AQUI_O_ID_DO_D1_DE_TESTE"
+database_id = "dcb96219-cf94-4d3a-9926-1faa910d1f19"
 migrations_dir = "../migrations"
 
 [env.staging.vars]
-ACCESS_TEAM_DOMAIN = "COLE_AQUI.cloudflareaccess.com"
-ACCESS_AUD = "COLE_AQUI_O_AUD_DO_DASHBOARD_DE_TESTE"
+ACCESS_TEAM_DOMAIN = "databairro.cloudflareaccess.com"   # time do Zero Trust já existente na conta
+ACCESS_AUD = "9fc15b4436133261f7f7165a66fd3a946729856ac09d57d615e288a76899b493"
 ABANDON_AFTER_MIN = "5"        # curto no teste, para ver "sem fim registrado" sem esperar 30 min
 RANKING_MIN_ATTEMPTS = "1"

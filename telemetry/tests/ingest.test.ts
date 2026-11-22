@@ -168,6 +168,10 @@ describe("ingestão: superfície mínima, CORS e limites", () => {
     for (let i = 0; i < 125; i++) last = (await send(env, [new FakeRun().start()], now, { ip: "198.51.100.9" })).status;
     assert.equal(last, 429);
     assert.equal((await send(env, [new FakeRun().start()], now, { ip: "198.51.100.10" })).status, 204, "outro IP não é afetado");
+    const lenient = { ...ingestEnv(), RATE_LIMITER: { limit: async () => ({ success: true }) } };
+    let lenientLast = 0;
+    for (let i = 0; i < 125; i++) lenientLast = (await send(lenient, [new FakeRun().start()], now, { ip: "198.51.100.11" })).status;
+    assert.equal(lenientLast, 429, "o contador em memória segura a rajada mesmo se o binding da Cloudflare deixar passar");
     const tables = env.DB.raw.prepare("SELECT sql FROM sqlite_master WHERE type = 'table'").all() as { sql: string }[];
     assert.ok(tables.every((t) => !/\bip\b|user_agent|email|location/i.test(t.sql)), "nenhuma coluna de IP, user-agent, e-mail ou localização");
   });

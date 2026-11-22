@@ -59,13 +59,25 @@ r = await fetch(`${ingest}/v1/events`, { headers: { origin } });
 check("GET /v1/events não lê nada", r.status === 405 && (await r.text()) === "405", `HTTP ${r.status}`);
 
 if (!args.includes("--no-ratelimit")) {
-  // o limitador da Cloudflare é aproximado e por local; aqui só confirmamos que ele existe
-  let limited = 0;
-  const tries = 200;
+  // O limitador da Cloudflare é aproximado, por local e com consistência eventual: uma rajada simultânea
+  // passa antes de os contadores sincronizarem. O que importa é segurar um fluxo contínuo (60 a cada 10 s).
   const fake = { v: 1, events: [{ ...batch[0], id: crypto.randomUUID(), run: crypto.randomUUID() }] };
-  const all = await Promise.all(Array.from({ length: tries }, () => post(fake).then((x) => x.status)));
-  limited = all.filter((s) => s === 429).length;
-  check("limite de requisições atua (algumas 429 em 200 seguidas)", limited > 0, `${limited} de ${tries} limitadas`);
+  // 8 conexões contínuas (~bem acima de 6 req/s) até a primeira 429 ou 40 s
+  const t0 = Date.now();
+  let sent = 0;
+  let firstBlock = 0;
+  const lane = async () => {
+    while (!firstBlock && sent < 2000 && Date.now() - t0 < 40_000) {
+      const n = ++sent;
+      if ((await post(fake)).status === 429 && !firstBlock) firstBlock = n;
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, lane));
+  check(
+    "limite de requisições segura fluxo contínuo",
+    firstBlock > 0,
+    firstBlock ? `primeira 429 na requisição ${firstBlock}, após ${((Date.now() - t0) / 1000).toFixed(1)} s` : `nenhuma 429 em ${sent}`,
+  );
 }
 
 // ---------- dashboard ----------
