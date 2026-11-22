@@ -20,7 +20,7 @@ migrations_dir = "../migrations"
 
 [vars]
 ALLOWED_ORIGINS = "https://maedodeam.com.br"
-RETENTION_DAYS = "400"
+RETENTION_DAYS = "180"   # igual a retention_days em telemetry/client.config.json (o teste confere)
 
 # Limite por IP no limitador da própria Cloudflare (o IP não chega ao banco).
 [[ratelimits]]
@@ -28,6 +28,6 @@ name = "RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 120, period = 60 }
 
-# Retenção: apaga dados brutos com mais de RETENTION_DAYS dias, todo dia às 03:17 UTC.
+# Retenção: apaga as métricas com mais de RETENTION_DAYS dias (30–400), todo dia às 03:17 UTC.
 [triggers]
 crons = ["17 3 * * *"]

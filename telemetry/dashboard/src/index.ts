@@ -93,7 +93,7 @@ export async function handle(req: Request, env: Env, fetchImpl: FetchLike, now =
   }
 }
 
-/** Partidas (anônimas) para o CSV: sem nada além do que o banco tem. */
+/** Partidas (anônimas) para o CSV: uma linha por partida (não por pessoa), sem nada além do que o banco tem. */
 async function exportRuns(db: D1Database, f: Filters): Promise<Record<string, unknown>[]> {
   const c: string[] = [];
   const a: unknown[] = [];
@@ -106,9 +106,9 @@ async function exportRuns(db: D1Database, f: Filters): Promise<Record<string, un
     .prepare(
       `SELECT run_id, started_at, version, device, lang, max_n AS level, score, wins,
               CASE WHEN status = 'over' THEN 'game_over'
-                   WHEN status = 'abandoned' THEN 'abandono_detectado_' || coalesce(abandon_reason, '?')
-                   WHEN last_seen_at < ? AND (has_start = 0 OR max_seq + 1 > events) THEN 'incompleta_comunicacao'
-                   WHEN last_seen_at < ? THEN 'abandono_presumido'
+                   WHEN status = 'abandoned' THEN 'abandono_confirmado_' || coalesce(abandon_reason, '?')
+                   WHEN last_seen_at < ? AND (has_start = 0 OR max_seq + 1 > events) THEN 'sem_fim_falha_de_envio'
+                   WHEN last_seen_at < ? THEN 'sem_fim_presumido'
                    ELSE 'em_andamento' END AS outcome
        FROM runs ${c.length ? "WHERE " + c.join(" AND ") : ""} ORDER BY started_at LIMIT 50000`,
     )

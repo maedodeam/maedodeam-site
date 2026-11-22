@@ -144,25 +144,60 @@ def version(*files):
     return h.hexdigest()[:8]
 
 
-def telemetry_origin():
-    """Origem do serviço de telemetria (telemetry/client.config.json), ou None se a telemetria estiver desligada."""
-    cfg = json.loads((ROOT / "telemetry" / "client.config.json").read_text(encoding="utf-8"))
+MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def telemetry_config():
+    """Telemetria (telemetry/client.config.json). None = desligada (padrão): o site sai exatamente como sem ela.
+    Ligada, a MESMA chave liga tudo junto: coleta no jogo, CSP, aviso e botão na tela inicial, textos e a seção
+    da política de privacidade (com a data e a retenção daqui)."""
+    # TELEMETRY_CONFIG: outro arquivo de configuração (só para testes com --print, que não gravam nada)
+    cfg_path = Path(os.environ.get("TELEMETRY_CONFIG") or ROOT / "telemetry" / "client.config.json")
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     endpoint = (cfg.get("endpoint") or "").strip()
     if not endpoint:
         return None
     m = re.match(r"^(https://[a-z0-9.-]+(?::\d+)?|http://(?:127\.0\.0\.1|localhost):\d+)(?:/|$)", endpoint, re.I)
     if not m:
         raise SystemExit(f"telemetry/client.config.json: endpoint inválido: {endpoint}")
-    return m.group(1)
+    date = (cfg.get("policy_date") or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        raise SystemExit("telemetry/client.config.json: policy_date (AAAA-MM-DD) é obrigatória com a telemetria ligada")
+    days = cfg.get("retention_days")
+    if not isinstance(days, int) or not 30 <= days <= 400:
+        raise SystemExit("telemetry/client.config.json: retention_days precisa ser um inteiro entre 30 e 400")
+    y, mo, d = (int(x) for x in date.split("-"))
+    return {"origin": m.group(1), "policy_date_pt": f"{d:02d}/{mo:02d}/{y}", "policy_date_en": f"{MONTHS_EN[mo - 1]} {d}, {y}",
+            "retention_days": days}
+
+
+def with_telemetry_texts(t):
+    """Troca cada texto pela versão "<chave>_telemetry", quando existir (ex.: avisos de privacidade)."""
+    if isinstance(t, dict):
+        return {k: with_telemetry_texts(t.get(k + "_telemetry", v) if not k.endswith("_telemetry") else v) for k, v in t.items()}
+    return t
+
+
+def metrics_toggle(t, privacy_href):
+    """Aviso discreto + botão para desligar as métricas (só com a telemetria ligada). O jogo cuida do estado."""
+    p = t["play"]
+    e = lambda s: html.escape(s, quote=True)
+    return ('\n      ' + f'<p class="mm-metrics"><button id="mm-metrics" class="mm-metrics-btn" type="button" aria-pressed="true" '
+            f'data-on="{e(p["metrics_on"])}" data-off="{e(p["metrics_off"])}" data-browser="{e(p["metrics_browser"])}" '
+            f'title="{e(p["metrics_hint"])}">{e(p["metrics_on"])}</button> '
+            f'<a href="{privacy_href}">{e(p["metrics_more"])}</a></p>')
 
 
 def build():
     out = {}
-    tele = telemetry_origin()
+    tele = telemetry_config()
     site = {"version": version(), "play_version": version("assets/play/game.js", "assets/play/play.css"), "email": EMAIL,
             # CSP do jogo: sem telemetria, nenhuma conexão; com ela, só o endereço do serviço
-            "connect_src": tele if tele else "'none'"}
+            "connect_src": tele["origin"] if tele else "'none'",
+            **({k: tele[k] for k in ("policy_date_pt", "policy_date_en", "retention_days")} if tele else {})}
     texts = {lang: load(lang) for lang in LANGS}
+    if tele:
+        texts = {lang: with_telemetry_texts(t) for lang, t in texts.items()}
 
     for lang, cfg in LANGS.items():
         t = texts[lang]
@@ -211,15 +246,13 @@ def build():
         p_url = f"{SITE}/{cfg['dir']}play/"
         p_alt = [("en", f"{SITE}/play/"), ("pt-BR", f"{SITE}/pt-br/play/"), ("x-default", f"{SITE}/play/")]
         pt_ = dict(t, meta=dict(t["meta"], title=t["play"]["meta_title"], description=t["play"]["meta_description"]))
-        if tele:
-            # com telemetria, o aviso da tela inicial muda: nada fica no aparelho, mas há estatísticas anônimas
-            pt_ = dict(pt_, play=dict(t["play"], note=t["play"]["note_telemetry"]))
         proot = root + "../"
         ppage = {
             "lang": lang, "root": proot, "home": "../",
             "title": pt_["meta"]["title"], "description": pt_["meta"]["description"],
             "seo": seo(pt_, p_url, p_alt, og_image, cfg["og_locale"], alt_locales, t["play"]["og_alt"]),
             "lang_switch": lang_switch(lang, {"en": ("EN", proot + "play/"), "pt-BR": ("PT", proot + "pt-br/play/")}, t["ui"]["lang_label"]),
+            "metrics": metrics_toggle(t, f"{proot}privacy.html#microgame-mayhem-{'pt' if lang == 'pt-BR' else 'en'}") if tele else "",
         }
         tpl = (SRC / "templates" / "play.html").read_text(encoding="utf-8")
         out[f"{cfg['dir']}play/index.html"] = render(tpl, {"t": pt_, "page": ppage, "site": site})
@@ -243,11 +276,14 @@ def build():
         "seo": f'<link rel="canonical" href="{SITE}/privacy.html">', "lang_switch": "",
     }
     ctx = {"t": t, "page": ppage, "site": site}
-    for name, partial in (("head", "{{> head}}"), ("header", "{{> header}}"), ("footer", "{{> footer}}")):
+    blocks = [("head", "{{> head}}"), ("header", "{{> header}}"), ("footer", "{{> footer}}"),
+              ("telemetry", "{{> privacy-microgame-mayhem}}" if tele else "")]
+    for name, partial in blocks:
         block = re.compile(rf"(<!-- build:{name} -->\n)(?:.*?\n)?(<!-- /build:{name} -->)", re.S)
         if not block.search(pp):
             raise SystemExit(f"privacy.html: marcador build:{name} não encontrado")
-        pp = block.sub(lambda m: m.group(1) + render(partial, ctx).rstrip("\n") + "\n" + m.group(2), pp)
+        content = render(partial, ctx).rstrip("\n") if partial else ""
+        pp = block.sub(lambda m: m.group(1) + (content + "\n" if content else "") + m.group(2), pp)
     out["privacy.html"] = pp
 
     # Sitemap e robots
@@ -271,6 +307,11 @@ def build():
 def main():
     if not EMAIL or "@" not in EMAIL:
         sys.exit("Defina a variável de ambiente SITE_CONTACT_EMAIL com o e-mail de contato do site.")
+    if "--print" in sys.argv:
+        # mostra uma página gerada sem gravar nada (usado pelos testes da telemetria)
+        page = sys.argv[sys.argv.index("--print") + 1]
+        sys.stdout.buffer.write(build()[page].encode("utf-8"))
+        return
     check = "--check" in sys.argv
     stale = []
     for rel, content in build().items():

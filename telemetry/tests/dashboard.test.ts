@@ -3,6 +3,7 @@
 import { describe, test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { handle, type Env } from "../dashboard/src/index.ts";
+import { PAGE_HTML, APP_JS } from "../dashboard/src/page.ts";
 import { _resetCertCache } from "../dashboard/src/access.ts";
 import { SqliteD1 } from "./sqlite-d1.ts";
 import { AUD, EMAIL, TEAM, accessKeys, certFetch, claims, signToken } from "./helpers.ts";
@@ -75,6 +76,26 @@ describe("dashboard: acesso", () => {
     assert.ok(p);
   });
 
+  test("sem token: endereços alternativos e outros métodos também são negados (sem revelar se a rota existe)", async () => {
+    const k = await accessKeys();
+    const paths = ["//api/summary", "/api/summary/", "/API/summary", "/api/summary%2F", "/api/./summary", "/app.js?x=1", "/api/export.csv?kind=microgames&from=2026-01-01", "/%2e%2e/api/summary"];
+    for (const path of paths) {
+      for (const method of ["GET", "HEAD", "OPTIONS", "POST"]) {
+        const res = await handle(req(path, undefined, { method }), env(), certFetch(k.certs), NOW);
+        assert.equal(res.status, 403, `${method} ${path}`);
+      }
+    }
+  });
+
+  test("com token válido, só as rotas exatas respondem; variações dão 404 sem dados", async () => {
+    const k = await accessKeys();
+    const token = await signToken(k.pair.privateKey, k.kid, claims(NOW));
+    for (const path of ["//api/summary", "/api/summary/", "/API/summary", "/api/export.csv?kind=../../etc"]) {
+      const res = await handle(req(path, token), env(), certFetch(k.certs), NOW);
+      assert.equal(res.status, 404, path);
+    }
+  });
+
   test("sem configuração do Access (falha fechada): nega mesmo com token bem formado", async () => {
     const k = await accessKeys();
     const token = await signToken(k.pair.privateKey, k.kid, claims(NOW));
@@ -105,5 +126,16 @@ describe("dashboard: acesso", () => {
     const token = await signToken(k.pair.privateKey, k.kid, claims(NOW));
     const res = await handle(req("/api/summary?device=mobile'%20OR%201=1--&version=x;drop&from=ontem&difficulty=9", token), env(), certFetch(k.certs), NOW);
     assert.equal(res.status, 200);
+  });
+});
+
+describe("dashboard: partidas não são jogadores", () => {
+  test("a página deixa claro que conta partidas, e nenhuma métrica fala em jogadores/usuários únicos", () => {
+    assert.match(PAGE_HTML, /Tudo aqui conta <strong>partidas<\/strong>/);
+    assert.match(PAGE_HTML, /não há contagem de jogadores únicos/);
+    for (const word of ["usuários", "usuário", "visitantes", "jogadores ativos", "players", "users"]) {
+      assert.ok(!APP_JS.toLowerCase().includes(word), `métrica com "${word}"`);
+    }
+    assert.match(APP_JS, /partidas, não jogadores/);
   });
 });

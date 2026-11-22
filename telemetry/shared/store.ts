@@ -83,13 +83,17 @@ export async function storeEvents(db: D1Database, events: ValidEvent[], now: num
   }
 
   const stmts: D1PreparedStatement[] = [];
-  // 3) partidas (upsert idempotente)
+  // 3) ids dos eventos primeiro: a contagem da partida vem deles (dois lotes iguais ao mesmo tempo não contam em dobro)
+  for (const e of fresh) {
+    stmts.push(db.prepare("INSERT OR IGNORE INTO seen_events (event_id, run_id, type, received_at) VALUES (?1, ?2, ?3, ?4)").bind(e.id, e.run, e.type, now));
+  }
+  // 4) partidas (upsert idempotente; na primeira vez, a contagem também vem de seen_events)
   for (const a of agg.values()) {
     stmts.push(
       db
         .prepare(
           `INSERT INTO runs (run_id, started_at, last_seen_at, version, lang, device, has_start, status, abandon_reason, max_n, score, wins, events, max_seq)
-           VALUES (?1, ?2, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+           VALUES (?1, ?2, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, (SELECT count(*) FROM seen_events WHERE run_id = ?1), ?13)
            ON CONFLICT(run_id) DO UPDATE SET
              last_seen_at = max(runs.last_seen_at, excluded.last_seen_at),
              version = CASE WHEN excluded.has_start = 1 THEN excluded.version ELSE runs.version END,
@@ -103,15 +107,14 @@ export async function storeEvents(db: D1Database, events: ValidEvent[], now: num
              max_n = max(runs.max_n, excluded.max_n),
              score = coalesce(excluded.score, runs.score),
              wins = coalesce(excluded.wins, runs.wins),
-             events = runs.events + excluded.events,
+             events = (SELECT count(*) FROM seen_events WHERE seen_events.run_id = excluded.run_id),
              max_seq = max(runs.max_seq, excluded.max_seq)`,
         )
         .bind(a.run, now, a.version, a.lang, a.device, a.hasStart, a.status, a.abandonReason, a.maxN, a.score, a.wins, a.events, a.maxSeq),
     );
   }
-  // 4) eventos (os ids entram em seen_events; resultados e vidas nas tabelas próprias)
+  // 5) resultados e mudanças de vida (chave = id do evento: repetição não duplica)
   for (const e of fresh) {
-    stmts.push(db.prepare("INSERT OR IGNORE INTO seen_events (event_id, run_id, type, received_at) VALUES (?1, ?2, ?3, ?4)").bind(e.id, e.run, e.type, now));
     if (e.type === "microgame_result") {
       const device = agg.get(e.run)?.device ?? null;
       stmts.push(

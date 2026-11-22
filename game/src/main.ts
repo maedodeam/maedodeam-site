@@ -235,10 +235,32 @@ document.addEventListener("visibilitychange", () => {
   if (TELEMETRY_URL && document.hidden) tele?.flushNow(true);
 });
 // fechar ou sair da página no meio da partida = abandono detectado (sendBeacon, sem esperar resposta)
+// (Se a página só foi para o cache de voltar/avançar, ela pode voltar: aí não é abandono, só envia a fila.)
 if (TELEMETRY_URL)
-  window.addEventListener("pagehide", () => {
-    if (tele?.active && session.phase !== "over" && session.phase !== "title") tele.abandon("pagehide", session.played, true);
+  window.addEventListener("pagehide", (e) => {
+    if (!tele) return;
+    if (e.persisted) tele.flushNow(true);
+    else if (tele.active && session.phase !== "over" && session.phase !== "title") tele.abandon("pagehide", session.played, true);
   });
+
+// Interruptor das métricas na tela inicial (só existe na página quando a telemetria está ligada no build).
+if (TELEMETRY_URL) {
+  const btn = document.getElementById("mm-metrics") as HTMLButtonElement | null;
+  const sync = () => {
+    if (!btn || !tele) return;
+    const state = tele.browserOptOut ? "browser" : tele.userEnabled ? "on" : "off";
+    btn.textContent = btn.dataset[state] ?? "";
+    btn.setAttribute("aria-pressed", String(state === "on"));
+    btn.disabled = state === "browser";
+    btn.dataset.state = state;
+  };
+  btn?.addEventListener("click", () => {
+    if (!tele || tele.browserOptOut) return;
+    tele.setUserEnabled(!tele.userEnabled);
+    sync();
+  });
+  sync();
+}
 window.addEventListener("blur", () => {
   if (session.phase === "game" || session.phase === "between") pause();
 });

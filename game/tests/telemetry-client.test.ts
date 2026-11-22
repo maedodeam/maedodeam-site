@@ -117,6 +117,29 @@ describe("cliente de telemetria", () => {
     assert.equal(tele.active, false);
   });
 
+  test("botão da tela inicial: desligar para na hora (descarta a fila) e ligar de novo volta a enviar", () => {
+    const { tele, sent } = make();
+    tele.startRun({ lang: "pt", device: "mobile" });
+    tele.result(result(1));
+    tele.setUserEnabled(false);
+    assert.equal(tele.userEnabled, false);
+    assert.equal(tele.disabled, true);
+    tele.result(result(2));
+    tele.gameOver({ n: 2, score: 0, wins: 1 });
+    assert.equal(sent.length, 1, "só o game_start, enviado antes de desligar");
+    tele.setUserEnabled(true);
+    tele.startRun({ lang: "pt", device: "mobile" });
+    assert.equal(sent.length, 2, "ligado de novo, a próxima partida é enviada");
+  });
+
+  test("com Do Not Track / GPC, o botão não consegue ligar", () => {
+    const { tele, sent } = make({ optedOut: true });
+    assert.equal(tele.browserOptOut, true);
+    tele.setUserEnabled(true);
+    tele.startRun({ lang: "pt", device: "mobile" });
+    assert.equal(sent.length, 0);
+  });
+
   test("a fila em memória tem limite", () => {
     const { tele } = make();
     tele.startRun({ lang: "pt", device: "mobile" });

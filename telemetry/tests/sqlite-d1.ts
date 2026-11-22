@@ -47,12 +47,16 @@ export class SqliteD1 implements D1Database {
   prepare(sql: string): D1PreparedStatement {
     return new Stmt(this.raw, sql);
   }
-  /** Como no D1: tudo numa transação; se um comando falhar, nada fica. */
+  /** Como no D1: tudo numa transação, executada de uma vez (sem intercalar com outro lote); se um comando falhar, nada fica. */
   async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
     const out: D1Result[] = [];
     this.raw.exec("BEGIN");
     try {
-      for (const s of statements) out.push(await s.run());
+      for (const s of statements) {
+        const st = s as Stmt;
+        const r = this.raw.prepare(st.sql).run(...st.params);
+        out.push({ results: [], success: true, meta: { changes: Number(r.changes) } });
+      }
       this.raw.exec("COMMIT");
     } catch (e) {
       this.raw.exec("ROLLBACK");

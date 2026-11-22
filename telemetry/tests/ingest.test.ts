@@ -37,6 +37,18 @@ describe("ingestão: caminho feliz e idempotência", () => {
     assert.equal((env.DB.raw.prepare("SELECT events FROM runs").get() as { events: number }).events, 2);
   });
 
+  test("dois lotes iguais chegando ao mesmo tempo: nada é contado em dobro", async () => {
+    const env = ingestEnv();
+    const r = new FakeRun();
+    const batch = [r.start(), r.result(1, "swat-fly", "win"), r.result(2, "quick-draw", "lose", 3)];
+    const res = await Promise.all([send(env, batch), send(env, batch), send(env, batch)]);
+    assert.ok(res.every((x) => x.status === 204));
+    assert.equal(count(env, "results"), 2);
+    assert.equal(count(env, "seen_events"), 3);
+    const run = env.DB.raw.prepare("SELECT events, max_seq, max_n FROM runs").get() as Record<string, number>;
+    assert.deepEqual({ ...run }, { events: 3, max_seq: 2, max_n: 2 }, "contagem pelos ids guardados: sem lacunas falsas");
+  });
+
   test("ordem de chegada não importa: Game Over vence um abandono que chega depois", async () => {
     const env = ingestEnv();
     const r = new FakeRun();

@@ -65,7 +65,12 @@ export class Telemetry {
   private t0 = 0;
   private scheduled = false;
   private failures = 0;
-  disabled = false;
+  /** Desligada por falhas de rede nesta aba. */
+  private broken = false;
+  /** O navegador pede para não rastrear (Do Not Track / Global Privacy Control): nunca envia. */
+  readonly browserOptOut: boolean;
+  /** A pessoa desligou as métricas na tela inicial (vale até fechar a página: nada pode ser guardado). */
+  private userOptOut = false;
 
   constructor(o: TelemetryOpts) {
     this.url = o.endpoint.replace(/\/+$/, "") + "/v1/events";
@@ -78,7 +83,26 @@ export class Telemetry {
       online: o.online ?? (() => typeof navigator === "undefined" || navigator.onLine !== false),
       optedOut: o.optedOut ?? browserOptOut,
     };
-    this.disabled = safe(() => this.o.optedOut(), true);
+    this.browserOptOut = safe(() => this.o.optedOut(), true);
+  }
+
+  /** Nada é enviado: o navegador pediu, a pessoa desligou ou o serviço falhou demais. */
+  get disabled(): boolean {
+    return this.browserOptOut || this.userOptOut || this.broken;
+  }
+
+  /** As métricas estão ligadas pela escolha da pessoa (o interruptor da tela inicial). */
+  get userEnabled(): boolean {
+    return !this.userOptOut;
+  }
+
+  /** Interruptor da tela inicial. Desligar descarta a fila e encerra o envio na hora. */
+  setUserEnabled(on: boolean): void {
+    this.userOptOut = !on;
+    if (!on) {
+      this.queue = [];
+      this.run = null;
+    }
   }
 
   /** Há uma partida em andamento (para decidir se fechar a página é abandono). */
@@ -183,7 +207,7 @@ export class Telemetry {
   fail(): void {
     this.failures++;
     if (this.failures >= MAX_FAILURES) {
-      this.disabled = true;
+      this.broken = true;
       this.queue = [];
     }
   }

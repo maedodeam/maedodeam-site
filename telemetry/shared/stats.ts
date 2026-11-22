@@ -1,13 +1,16 @@
 // Estatísticas para o dashboard privado. Toda métrica informa o tamanho da amostra (n).
 //
 // Definições:
+// - Tudo aqui conta PARTIDAS (sessões de jogo), nunca pessoas: não existe identificador de jogador, então não há
+//   (nem pode haver) contagem de jogadores únicos. Uma pessoa que joga 5 vezes são 5 partidas.
 // - "nível" de uma partida = quantos microgames ela concluiu (max_n; 0 = saiu durante o primeiro).
-//   "Nível final" = o das partidas encerradas.
-// - Partida encerrada: Game Over, abandono detectado (saiu para o título / fechou a página) ou abandono presumido
-//   (sem eventos há mais de `abandonAfterMin` minutos e sem fim registrado).
-// - Abandono presumido "com lacunas": faltam eventos da partida (sequência com buracos ou sem game_start) —
-//   provável falha de comunicação, não necessariamente abandono.
-// - Em andamento: sem fim registrado e com evento recente; não entra nas taxas.
+// - Desfechos (mutuamente exclusivos):
+//   · Game Over: evento game_over recebido;
+//   · abandono CONFIRMADO: evento game_abandon recebido (saiu pelo menu, ou fechou a página de verdade);
+//   · SEM FIM REGISTRADO: nenhum dos dois e nenhum evento há mais de `abandonAfterMin` minutos. NÃO é abandono
+//     confirmado; divide-se em "presumido" (sequência completa: provavelmente parou sem o navegador avisar) e
+//     "falha de envio" (faltam eventos ou o game_start: provável problema de comunicação);
+//   · em andamento: sem fim e com evento recente; fica fora das taxas e dos níveis finais.
 import type { D1Database } from "./d1.ts";
 import { CATALOG } from "./catalog.gen.ts";
 
@@ -97,8 +100,9 @@ export async function summary(db: D1Database, f: Filters) {
     .first<Record<string, number>>();
   const r = row ?? {};
   const total = r.total ?? 0;
+  // partidas sem atividade recente (com desfecho conhecido ou sem fim registrado): a base das taxas
   const finished = total - (r.in_progress ?? 0);
-  const abandoned = (r.detected ?? 0) + (r.presumed ?? 0) + (r.incomplete ?? 0);
+  const noEnd = (r.presumed ?? 0) + (r.incomplete ?? 0);
 
   // níveis finais (partidas encerradas)
   const histRows = await db
@@ -121,14 +125,14 @@ export async function summary(db: D1Database, f: Filters) {
     for (const [n, v] of hist) if (n >= k) c += v;
     progression.push({ k, reached: c, pct: pct(c, levels.n) });
   }
-  // em que microgame se abandona (detectado + presumido)
+  // em que microgame as partidas terminam sem Game Over: abandono confirmado x sem fim registrado
   const abandonRows = await db
     .prepare(
-      `SELECT max_n AS n, count(*) AS c FROM runs ${w.sql ? w.sql + " AND" : "WHERE"}
-       (status = 'abandoned' OR (${open} AND last_seen_at < ?)) GROUP BY max_n ORDER BY max_n`,
+      `SELECT max_n AS n, coalesce(sum(status = 'abandoned'), 0) AS confirmed, coalesce(sum(${open} AND last_seen_at < ?), 0) AS no_end
+       FROM runs ${w.sql ? w.sql + " AND" : "WHERE"} (status = 'abandoned' OR (${open} AND last_seen_at < ?)) GROUP BY max_n ORDER BY max_n`,
     )
-    .bind(...w.args, cut)
-    .all<{ n: number; c: number }>();
+    .bind(cut, ...w.args, cut)
+    .all<{ n: number; confirmed: number; no_end: number }>();
 
   return {
     runs: {
@@ -136,17 +140,17 @@ export async function summary(db: D1Database, f: Filters) {
       finished,
       in_progress: r.in_progress ?? 0,
       game_over: { n: r.over ?? 0, pct: pct(r.over ?? 0, finished) },
-      abandoned: { n: abandoned, pct: pct(abandoned, finished) },
-      abandoned_detected: { n: r.detected ?? 0, pct: pct(r.detected ?? 0, finished), quit: r.detected_quit ?? 0, pagehide: r.detected_pagehide ?? 0 },
-      abandoned_presumed: { n: r.presumed ?? 0, pct: pct(r.presumed ?? 0, finished) },
-      incomplete_comm: { n: r.incomplete ?? 0, pct: pct(r.incomplete ?? 0, finished) },
+      abandoned_confirmed: { n: r.detected ?? 0, pct: pct(r.detected ?? 0, finished), quit: r.detected_quit ?? 0, pagehide: r.detected_pagehide ?? 0 },
+      no_end: { n: noEnd, pct: pct(noEnd, finished) },
+      no_end_presumed: { n: r.presumed ?? 0, pct: pct(r.presumed ?? 0, finished) },
+      no_end_comm: { n: r.incomplete ?? 0, pct: pct(r.incomplete ?? 0, finished) },
       start_missing: r.start_missing ?? 0,
       never_played: zero,
     },
     levels: { ...levels, bands },
     progression,
-    abandon_at: abandonRows.results.map((x) => ({ n: x.n, c: x.c })),
-    sample: { runs: total, finished_runs: finished },
+    abandon_at: abandonRows.results.map((x) => ({ n: x.n, confirmed: x.confirmed, no_end: x.no_end })),
+    sample: { runs: total, finished_runs: finished, unit: "partidas (não jogadores)" },
     abandon_after_min: f.abandonAfterMin,
   };
 }
@@ -207,16 +211,25 @@ export async function compare(db: D1Database, f: Filters) {
         .prepare(
           `SELECT coalesce(${col}, '?') AS key, count(*) AS runs,
                   coalesce(sum(status = 'over'), 0) AS over,
-                  coalesce(sum(status = 'abandoned' OR (status = 'open' AND last_seen_at < ?)), 0) AS abandoned,
+                  coalesce(sum(status = 'abandoned'), 0) AS abandoned,
+                  coalesce(sum(status = 'open' AND last_seen_at < ?), 0) AS no_end,
                   coalesce(sum(status = 'open' AND last_seen_at >= ?), 0) AS in_progress,
                   avg(CASE WHEN NOT (status = 'open' AND last_seen_at >= ?) THEN max_n END) AS mean_level
            FROM runs ${w.sql} GROUP BY ${col} ORDER BY runs DESC LIMIT 50`,
         )
         .bind(cut, cut, cut, ...w.args)
-        .all<{ key: string; runs: number; over: number; abandoned: number; in_progress: number; mean_level: number | null }>()
+        .all<{ key: string; runs: number; over: number; abandoned: number; no_end: number; in_progress: number; mean_level: number | null }>()
     ).results.map((x) => {
       const finished = x.runs - x.in_progress;
-      return { ...x, finished, abandon_pct: pct(x.abandoned, finished), mean_level: x.mean_level != null ? Math.round(x.mean_level * 100) / 100 : null };
+      return {
+        key: x.key,
+        runs: x.runs,
+        finished,
+        over_pct: pct(x.over, finished),
+        abandon_confirmed_pct: pct(x.abandoned, finished),
+        no_end_pct: pct(x.no_end, finished),
+        mean_level: x.mean_level != null ? Math.round(x.mean_level * 100) / 100 : null,
+      };
     });
   const rw = resultWhere({ ...f, device: undefined, version: undefined, difficulty: undefined }, false);
   const resultsBy = async (col: "device" | "difficulty" | "version" | "wtf") =>

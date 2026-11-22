@@ -191,7 +191,8 @@
     "stamp": "HTML estático · Sem cookies · Sem rastreadores",
     "seq1": "Ideia",
     "seq2": "Software",
-    "seq3": "Produto"
+    "seq3": "Produto",
+    "stamp_telemetry": "HTML estático · Sem cookies · Métricas anônimas só no jogo"
   },
   "support": {
     "label": "Suporte",
@@ -221,7 +222,7 @@
     "play": "JOGAR",
     "controls": "Mouse, teclado ou toque. Cada jogo diz como.",
     "note": "Nada fica guardado. Fechou a página, sumiu.",
-    "note_telemetry": "Nada fica guardado no seu aparelho. Estatísticas anônimas de jogo ajudam a equilibrar as fases — sem nome, sem rastreio.",
+    "note_telemetry": "Nada fica no seu aparelho. Usamos métricas anônimas de jogo para equilibrar as fases.",
     "canvas_label": "Área do jogo Microgame Mayhem",
     "noscript": "O Microgame Mayhem precisa de JavaScript para rodar.",
     "pause": "Pausar",
@@ -243,6 +244,13 @@
     "cta_text": "300 joguinhos feitos aqui dentro. Quatro vidas, nada salvo, e cada jogo dura mais ou menos o tempo da sua atenção. Funciona com mouse, teclado ou toque.",
     "cta_button": "Jogar agora",
     "cta_meta": "Jogo no navegador · Computador e celular · Sem cadastro",
-    "cta_verbs": "ESMAGA! · DESVIA! · ENCHE! · FATIA! · PULA! · REPETE! · ARQUIVA! · RESOLVE! · SEGURA! · NÃO ENCOSTA! · "
+    "cta_verbs": "ESMAGA! · DESVIA! · ENCHE! · FATIA! · PULA! · REPETE! · ARQUIVA! · RESOLVE! · SEGURA! · NÃO ENCOSTA! · ",
+    "meta_description_telemetry": "300 joguinhos, 4 vidas, sem salvar o progresso. Uma maratona de microgames rápida e absurda feita pela MAEDODEAM. Roda no navegador, no computador e no celular.",
+    "metrics_on": "Métricas de jogo: ligadas · desligar",
+    "metrics_off": "Métricas de jogo: desligadas · ligar",
+    "metrics_browser": "Métricas desligadas pelo seu navegador",
+    "metrics_hint": "Vale até fechar a página. Para desligar sempre, ative o Global Privacy Control ou o Do Not Track do navegador.",
+    "metrics_more": "Como funciona",
+    "cta_text_telemetry": "300 joguinhos feitos aqui dentro. Quatro vidas, sem salvar o progresso, e cada jogo dura mais ou menos o tempo da sua atenção. Funciona com mouse, teclado ou toque."
   }
 }

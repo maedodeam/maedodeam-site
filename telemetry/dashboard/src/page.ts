@@ -22,6 +22,7 @@ export const PAGE_HTML = `<!doctype html>
     <button type="submit">Aplicar</button>
   </form>
   <p class="note" id="who"></p>
+  <p class="note unit">Tudo aqui conta <strong>partidas</strong> (sessões de jogo), não jogadores: não existe identificador de pessoa, então não há contagem de jogadores únicos. Uma pessoa que joga 5 vezes são 5 partidas.</p>
 </header>
 <main>
   <section><h2>Resumo <small id="n-summary"></small></h2><div class="cards" id="cards"></div><p class="note" id="abandon-note"></p></section>
@@ -29,7 +30,10 @@ export const PAGE_HTML = `<!doctype html>
     <div><h2>Níveis finais por faixa <small id="n-bands"></small></h2><div id="bands" class="chart"></div></div>
     <div><h2>Progressão: % que chega ao microgame N <small id="n-prog"></small></h2><div id="progression" class="chart"></div></div>
   </section>
-  <section><h2>Onde abandonam (microgames concluídos) <small id="n-ab"></small></h2><div id="abandon" class="chart"></div></section>
+  <section class="two">
+    <div><h2>Abandono confirmado: em que ponto (microgames concluídos) <small id="n-ab"></small></h2><div id="abandon" class="chart"></div></div>
+    <div><h2>Sem fim registrado: última posição conhecida <small id="n-ne"></small></h2><div id="noend" class="chart"></div></div>
+  </section>
   <section><h2>Comparativos</h2><div id="compare" class="grid"></div></section>
   <section class="two">
     <div><h2>Maiores taxas de sucesso <small id="n-rank"></small></h2><ol id="easiest" class="rank"></ol></div>
@@ -68,6 +72,7 @@ section { background: var(--ink2); border: 1px solid var(--line); border-radius:
 .card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
 .card b { display: block; font-size: 22px; } .card span { color: var(--muted); font-size: 12px; } .card i { color: var(--muted); font-style: normal; font-size: 11px; display: block; }
 .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.note.unit { color: var(--paper); }
 .chart svg { width: 100%; height: auto; display: block; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -169,35 +174,38 @@ async function load() {
   const [s, m, c] = await Promise.all([get("/api/summary"), get("/api/microgames"), get("/api/compare")]);
   $("who").textContent = "Acesso: " + s.user + " · horários em UTC · abandono presumido após " + s.abandon_after_min + " min sem eventos";
   const r = s.runs;
-  $("n-summary").textContent = "n = " + r.total + " partidas (" + r.finished + " encerradas, " + r.in_progress + " em andamento)";
+  $("n-summary").textContent = "n = " + r.total + " partidas (" + r.finished + " sem atividade recente, " + r.in_progress + " em andamento)";
   $("cards").replaceChildren(
-    card("Partidas iniciadas", fmt(r.total), r.start_missing ? r.start_missing + " sem game_start recebido" : ""),
-    card("Game Over", fmt(r.game_over.n), fmt(r.game_over.pct, "% das encerradas")),
-    card("Abandonadas", fmt(r.abandoned.n), fmt(r.abandoned.pct, "% das encerradas")),
-    card("Abandono detectado", fmt(r.abandoned_detected.n), "saiu: " + r.abandoned_detected.quit + " · fechou: " + r.abandoned_detected.pagehide),
-    card("Abandono presumido", fmt(r.abandoned_presumed.n), fmt(r.abandoned_presumed.pct, "% das encerradas")),
-    card("Incompletas (comunicação)", fmt(r.incomplete_comm.n), "eventos faltando"),
-    card("Nível médio", fmt(s.levels.mean), "n = " + s.levels.n),
-    card("Nível mediano", fmt(s.levels.median), "n = " + s.levels.n),
-    card("Nível mais frequente", fmt(s.levels.mode), "moda · n = " + s.levels.n),
+    card("Partidas iniciadas", fmt(r.total), r.start_missing ? r.start_missing + " sem game_start recebido" : "partidas, não jogadores"),
+    card("Game Over", fmt(r.game_over.n), fmt(r.game_over.pct, "% · fim confirmado")),
+    card("Abandono confirmado", fmt(r.abandoned_confirmed.n), fmt(r.abandoned_confirmed.pct, "% · saiu: ") + r.abandoned_confirmed.quit + " · fechou: " + r.abandoned_confirmed.pagehide),
+    card("Sem fim registrado", fmt(r.no_end.n), fmt(r.no_end.pct, "% · não confirmado")),
+    card("· presumido", fmt(r.no_end_presumed.n), "sequência completa, parou de enviar"),
+    card("· falha de envio", fmt(r.no_end_comm.n), "faltam eventos"),
+    card("Nível médio", fmt(s.levels.mean), "n = " + s.levels.n + " partidas"),
+    card("Nível mediano", fmt(s.levels.median), "n = " + s.levels.n + " partidas"),
+    card("Nível mais frequente", fmt(s.levels.mode), "moda · n = " + s.levels.n + " partidas"),
   );
-  $("abandon-note").textContent = "Nível = microgames concluídos na partida (0 = saiu durante o primeiro). Taxas sobre as partidas encerradas. \\"Incompletas\\" = sem fim registrado e com eventos faltando (provável falha de envio), separadas do abandono presumido.";
+  $("abandon-note").textContent = "Nível = microgames concluídos na partida (0 = saiu durante o primeiro). Percentuais sobre as partidas sem atividade recente. \\"Sem fim registrado\\" NÃO é abandono confirmado: são partidas sem Game Over e sem aviso de saída há mais de " + s.abandon_after_min + " min (presumido = sequência completa; falha de envio = faltam eventos).";
   $("n-bands").textContent = "n = " + s.levels.n;
   bars($("bands"), s.levels.bands.map((b) => ({ label: b.band, value: b.runs, sub: fmt(b.pct, "%") })));
   $("n-prog").textContent = "n = " + s.levels.n;
   bars($("progression"), s.progression.filter((p) => p.k <= 40).map((p) => ({ label: "≥ " + p.k, value: p.pct, sub: p.reached })), "%");
-  const abTotal = s.abandon_at.reduce((a, b) => a + b.c, 0);
-  $("n-ab").textContent = "n = " + abTotal;
-  bars($("abandon"), s.abandon_at.slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.c })));
+  const abTotal = s.abandon_at.reduce((a, b) => a + b.confirmed, 0);
+  const neTotal = s.abandon_at.reduce((a, b) => a + b.no_end, 0);
+  $("n-ab").textContent = "n = " + abTotal + " partidas";
+  $("n-ne").textContent = "n = " + neTotal + " partidas";
+  bars($("abandon"), s.abandon_at.filter((a) => a.confirmed).slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.confirmed })));
+  bars($("noend"), s.abandon_at.filter((a) => a.no_end).slice(0, 40).map((a) => ({ label: "#" + a.n, value: a.no_end })));
 
   const cmp = $("compare"); cmp.replaceChildren();
   const box = (title, headers, rows) => { const d = el("div"); d.append(el("h2", title)); table(d, headers, rows); cmp.append(d); };
   const devName = { mobile: "celular", tablet: "tablet", desktop: "computador" };
-  box("Partidas por aparelho", ["Aparelho", "Partidas", "Encerradas", "Nível médio", "Abandono %"], c.device.runs.map((x) => [devName[x.key] || x.key, x.runs, x.finished, x.mean_level, x.abandon_pct]));
+  box("Partidas por aparelho", ["Aparelho", "Partidas", "Sem atividade", "Nível médio", "Game Over %", "Abandono confirmado %", "Sem fim %"], c.device.runs.map((x) => [devName[x.key] || x.key, x.runs, x.finished, x.mean_level, x.over_pct, x.abandon_confirmed_pct, x.no_end_pct]));
   box("Sucesso por aparelho", ["Aparelho", "Tentativas", "Sucesso %"], c.device.results.map((x) => [devName[x.key] || x.key, x.attempts, x.success_pct]));
   box("Sucesso por dificuldade", ["Dificuldade", "Tentativas", "Sucesso %"], c.difficulty.map((x) => ["●".repeat(Number(x.key)) || x.key, x.attempts, x.success_pct]));
   box("Sucesso por tipo", ["Tipo", "Tentativas", "Sucesso %"], c.wtf.map((x) => [x.key === "" ? "normal" : "WTF " + x.key, x.attempts, x.success_pct]));
-  box("Por versão do jogo", ["Versão", "Partidas", "Nível médio", "Abandono %"], c.version.runs.map((x) => [x.key, x.runs, x.mean_level, x.abandon_pct]));
+  box("Por versão do jogo", ["Versão", "Partidas", "Nível médio", "Game Over %", "Abandono confirmado %", "Sem fim %"], c.version.runs.map((x) => [x.key, x.runs, x.mean_level, x.over_pct, x.abandon_confirmed_pct, x.no_end_pct]));
   box("Sucesso por versão", ["Versão", "Tentativas", "Sucesso %"], c.version.results.map((x) => [x.key, x.attempts, x.success_pct]));
 
   const rk = m.ranking;

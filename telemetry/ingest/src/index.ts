@@ -15,7 +15,7 @@ export interface Env {
   DB: D1Database;
   /** Origens permitidas, separadas por vírgula (ex.: "https://maedodeam.com.br"). */
   ALLOWED_ORIGINS: string;
-  /** Dias de retenção dos dados brutos (padrão 400). */
+  /** Dias de retenção das métricas (padrão 180; sempre entre 30 e 400). Igual a retention_days da política. */
   RETENTION_DAYS?: string;
   /** Limitador de requisições da Cloudflare (binding [[ratelimits]]), se configurado. */
   RATE_LIMITER?: { limit(o: { key: string }): Promise<{ success: boolean }> };
@@ -68,6 +68,12 @@ async function underLimit(req: Request, env: Env, now: number): Promise<boolean>
   return slot.count <= FALLBACK_LIMIT;
 }
 
+/** Retenção efetiva, sempre entre 30 e 400 dias (padrão 180). */
+export function retentionDays(env: Pick<Env, "RETENTION_DAYS">): number {
+  const d = Math.round(Number(env.RETENTION_DAYS ?? "180"));
+  return Number.isFinite(d) && d > 0 ? Math.max(30, Math.min(400, d)) : 180;
+}
+
 export async function handle(req: Request, env: Env, now = Date.now()): Promise<Response> {
   const url = new URL(req.url);
   if (url.pathname !== PATH) return reply(404);
@@ -112,6 +118,6 @@ export default {
   },
   /** Cron diário: retenção dos dados brutos. */
   async scheduled(_event: unknown, env: Env): Promise<void> {
-    await purgeOld(env.DB, Date.now(), Number(env.RETENTION_DAYS ?? "400") || 400);
+    await purgeOld(env.DB, Date.now(), retentionDays(env));
   },
 };

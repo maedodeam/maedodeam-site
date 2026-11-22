@@ -1,3 +1,5 @@
 {
-  "endpoint": ""
+  "endpoint": "",
+  "policy_date": "",
+  "retention_days": 180
 }

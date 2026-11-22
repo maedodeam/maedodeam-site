@@ -42,21 +42,34 @@ async function scenario() {
 const F0: Filters = { abandonAfterMin: 30, now: NOW };
 
 describe("estatísticas", () => {
-  test("partidas: iniciadas, game over, abandono detectado × presumido × incompletas, em andamento", async () => {
+  test("partidas: iniciadas, Game Over, abandono confirmado, sem fim registrado (presumido × falha de envio), em andamento", async () => {
     const env = await scenario();
     const s = await summary(env.DB, F0);
     assert.equal(s.runs.total, 7);
     assert.equal(s.runs.in_progress, 1);
     assert.equal(s.runs.finished, 6);
     assert.equal(s.runs.game_over.n, 2);
-    assert.equal(s.runs.abandoned_detected.n, 2);
-    assert.equal(s.runs.abandoned_detected.quit, 1);
-    assert.equal(s.runs.abandoned_detected.pagehide, 1);
-    assert.equal(s.runs.abandoned_presumed.n, 1);
-    assert.equal(s.runs.incomplete_comm.n, 1);
-    assert.equal(s.runs.abandoned.n, 4);
-    assert.equal(s.runs.abandoned.pct, 66.7, "4 de 6 encerradas");
+    assert.equal(s.runs.abandoned_confirmed.n, 2);
+    assert.equal(s.runs.abandoned_confirmed.quit, 1);
+    assert.equal(s.runs.abandoned_confirmed.pagehide, 1);
+    assert.equal(s.runs.abandoned_confirmed.pct, 33.3, "só os 2 com evento de abandono (de 6)");
+    assert.equal(s.runs.no_end.n, 2);
+    assert.equal(s.runs.no_end_presumed.n, 1);
+    assert.equal(s.runs.no_end_comm.n, 1);
     assert.equal(s.sample.runs, 7);
+    assert.equal(s.sample.unit, "partidas (não jogadores)");
+  });
+
+  test("partida sem Game Over e sem evento de abandono NUNCA conta como abandono confirmado", async () => {
+    const env = ingestEnv();
+    const R = new FakeRun();
+    await send(env, [R.start(), R.result(1, "swat-fly", "win")], NOW - 5 * 24 * 60 * MIN);
+    const s = await summary(env.DB, F0);
+    assert.equal(s.runs.abandoned_confirmed.n, 0);
+    assert.equal(s.runs.no_end.n, 1);
+    const c = await compare(env.DB, F0);
+    assert.equal(c.device.runs[0].abandon_confirmed_pct, 0);
+    assert.equal(c.device.runs[0].no_end_pct, 100);
   });
 
   test("níveis finais: média, mediana, moda, faixas e progressão (sem as em andamento)", async () => {
@@ -72,8 +85,8 @@ describe("estatísticas", () => {
     assert.deepEqual(s.progression.find((p) => p.k === 4), { k: 4, reached: 1, pct: 16.7 });
     assert.deepEqual(s.progression.find((p) => p.k === 3), { k: 3, reached: 5, pct: 83.3 });
     assert.deepEqual(s.abandon_at, [
-      { n: 2, c: 1 },
-      { n: 3, c: 3 },
+      { n: 2, confirmed: 1, no_end: 0 },
+      { n: 3, confirmed: 1, no_end: 2 },
     ]);
   });
 
@@ -121,7 +134,10 @@ describe("estatísticas", () => {
     const env = await scenario();
     const c = await compare(env.DB, F0);
     const mobile = c.device.runs.find((x) => x.key === "mobile")!;
-    assert.deepEqual({ runs: mobile.runs, finished: mobile.finished, abandon: mobile.abandon_pct }, { runs: 3, finished: 3, abandon: 66.7 });
+    assert.deepEqual(
+      { runs: mobile.runs, finished: mobile.finished, confirmed: mobile.abandon_confirmed_pct, noEnd: mobile.no_end_pct, over: mobile.over_pct },
+      { runs: 3, finished: 3, confirmed: 66.7, noEnd: 0, over: 33.3 },
+    );
     assert.ok(c.difficulty.length >= 1);
     assert.deepEqual(c.version.runs.map((x) => x.key).sort(), ["v1", "v2"]);
     assert.equal(c.wtf[0].key, "");
