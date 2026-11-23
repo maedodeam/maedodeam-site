@@ -1,0 +1,210 @@
+// Estatísticas: contagens de partidas, abandono (detectado × presumido × falha de comunicação), níveis
+// (média, mediana, moda, faixas, progressão), microgames (tentativas, vitórias, partidas) e filtros.
+import { describe, test } from "node:test";
+import assert from "node:assert/strict";
+import { compare, describe as describeLevels, microgames, ranking, summary, toCsv, type Filters } from "../shared/stats.ts";
+import { FakeRun, ingestEnv, send } from "./helpers.ts";
+import { dayOf, dayStart, purgeOld, rollup, rollupStatements } from "../shared/store.ts";
+
+const NOW = Date.UTC(2026, 10, 22, 12, 0, 0);
+const MIN = 60_000;
+
+/** Cenário conhecido:
+ *  A: desktop v1, game over no 3 (2 vitórias)        → nível 3
+ *  B: mobile  v1, game over no 5                      → nível 5
+ *  C: mobile  v1, saiu para o título no 2             → abandono detectado (quit), nível 2
+ *  D: mobile  v2, fechou a página no 3                → abandono detectado (pagehide), nível 3
+ *  E: desktop v2, parou de mandar há 2 h, sem lacunas → abandono presumido, nível 3
+ *  F: desktop v2, há 2 h, faltou o evento seq 1       → incompleta (comunicação), nível 3
+ *  G: desktop v2, evento há 1 min                     → em andamento (fora das taxas)
+ */
+async function scenario() {
+  const env = ingestEnv();
+  const old = NOW - 2 * 60 * MIN;
+  const A = new FakeRun("v1", "desktop");
+  await send(env, [A.start(), A.result(1, "swat-fly", "win"), A.result(2, "quick-draw", "win"), A.result(3, "whack-bug", "lose", 0), A.over(3, 250, 2)], NOW - 10 * MIN);
+  const B = new FakeRun("v1", "mobile");
+  await send(env, [B.start(), B.result(1, "swat-fly", "lose", 3), B.result(2, "swat-fly", "lose", 2), B.result(3, "quick-draw", "lose", 1), B.result(4, "whack-bug", "win", 1), B.result(5, "whack-bug", "lose", 0), B.over(5, 125, 1)], NOW - 10 * MIN);
+  const C = new FakeRun("v1", "mobile");
+  await send(env, [C.start(), C.result(1, "swat-fly", "win"), C.result(2, "quick-draw", "lose", 3), C.abandon(2, "quit")], NOW - 10 * MIN);
+  const D = new FakeRun("v2", "mobile");
+  await send(env, [D.start(), D.result(1, "swat-fly", "win"), D.result(2, "swat-fly", "win"), D.result(3, "quick-draw", "win"), D.abandon(3, "pagehide")], NOW - 10 * MIN);
+  const E = new FakeRun("v2", "desktop");
+  await send(env, [E.start(), E.result(1, "swat-fly", "win"), E.result(2, "swat-fly", "win"), E.result(3, "quick-draw", "lose", 3)], old);
+  const F = new FakeRun("v2", "desktop");
+  const fs = F.start();
+  F.result(1, "swat-fly", "win"); // seq 1 perdido no caminho
+  await send(env, [fs, F.result(2, "swat-fly", "win"), F.result(3, "swat-fly", "win")], old);
+  const G = new FakeRun("v2", "desktop");
+  await send(env, [G.start(), G.result(1, "swat-fly", "win")], NOW - 1 * MIN);
+  return env;
+}
+
+const F0: Filters = { abandonAfterMin: 30, now: NOW };
+
+describe("estatísticas", () => {
+  test("partidas: iniciadas, Game Over, abandono voluntário, saída detectada, sem fim registrado (presumido × falha de envio), em andamento", async () => {
+    const env = await scenario();
+    const s = await summary(env.DB, F0);
+    assert.equal(s.runs.total, 7);
+    assert.equal(s.runs.in_progress, 1);
+    assert.equal(s.runs.finished, 6);
+    assert.equal(s.runs.game_over.n, 2);
+    assert.deepEqual(s.runs.abandon_voluntary, { n: 1, pct: 16.7 }, "só quem saiu pelo menu");
+    assert.deepEqual(s.runs.exit_detected, { n: 1, pct: 16.7 }, "fechou a página: saída detectada, não abandono voluntário");
+    assert.equal(s.runs.no_end.n, 2);
+    assert.equal(s.runs.no_end_presumed.n, 1);
+    assert.equal(s.runs.no_end_comm.n, 1);
+    assert.equal(s.sample.runs, 7);
+    assert.equal(s.sample.unit, "partidas (não jogadores)");
+  });
+
+  test("partida sem Game Over e sem evento de saída NUNCA conta como abandono", async () => {
+    const env = ingestEnv();
+    const R = new FakeRun();
+    await send(env, [R.start(), R.result(1, "swat-fly", "win")], NOW - 5 * 24 * 60 * MIN);
+    const s = await summary(env.DB, F0);
+    assert.equal(s.runs.abandon_voluntary.n, 0);
+    assert.equal(s.runs.exit_detected.n, 0);
+    assert.equal(s.runs.no_end.n, 1);
+    const c = await compare(env.DB, F0);
+    assert.equal(c.device.runs[0].voluntary_pct, 0);
+    assert.equal(c.device.runs[0].exit_pct, 0);
+    assert.equal(c.device.runs[0].no_end_pct, 100);
+  });
+
+  test("níveis finais: média, mediana, moda, faixas e progressão (sem as em andamento)", async () => {
+    const env = await scenario();
+    const s = await summary(env.DB, F0);
+    // níveis: 3, 5, 2, 3, 3, 3
+    assert.equal(s.levels.n, 6);
+    assert.equal(s.levels.mean, 3.17);
+    assert.equal(s.levels.median, 3);
+    assert.equal(s.levels.mode, 3);
+    assert.deepEqual(s.levels.bands[1], { band: "1–5", runs: 6, pct: 100 });
+    assert.deepEqual(s.levels.bands[0], { band: "0", runs: 0, pct: 0 });
+    assert.deepEqual(s.progression.find((p) => p.k === 4), { k: 4, reached: 1, pct: 16.7 });
+    assert.deepEqual(s.progression.find((p) => p.k === 3), { k: 3, reached: 5, pct: 83.3 });
+    assert.deepEqual(s.abandon_at, [
+      { n: 2, voluntary: 1, exit_detected: 0, no_end: 0 },
+      { n: 3, voluntary: 0, exit_detected: 1, no_end: 2 },
+    ]);
+  });
+
+  test("saída detectada (fechou a página) separada do abandono voluntário (saiu pelo menu)", async () => {
+    const env = ingestEnv();
+    const Q = new FakeRun();
+    const P1 = new FakeRun();
+    const P2 = new FakeRun();
+    await send(env, [Q.start(), Q.result(1, "swat-fly", "win"), Q.abandon(1, "quit")], NOW - 10 * MIN);
+    await send(env, [P1.start(), P1.abandon(0, "pagehide")], NOW - 10 * MIN);
+    await send(env, [P2.start(), P2.result(1, "swat-fly", "lose", 3), P2.abandon(1, "pagehide")], NOW - 10 * MIN);
+    const s = await summary(env.DB, F0);
+    assert.equal(s.runs.abandon_voluntary.n, 1);
+    assert.equal(s.runs.exit_detected.n, 2);
+    const c = await compare(env.DB, F0);
+    assert.deepEqual({ v: c.device.runs[0].voluntary_pct, e: c.device.runs[0].exit_pct }, { v: 33.3, e: 66.7 });
+  });
+
+  test("média, mediana (par e ímpar) e moda (empate fica com o menor)", () => {
+    assert.deepEqual(describeLevels(new Map([[2, 1], [4, 1]])), { n: 2, mean: 3, median: 3, mode: 2 });
+    assert.deepEqual(describeLevels(new Map([[1, 3], [10, 2]])), { n: 5, mean: 4.6, median: 1, mode: 1 });
+    assert.deepEqual(describeLevels(new Map()), { n: 0, mean: null, median: null, mode: null });
+  });
+
+  test("por microgame: tentativas, vitórias, derrotas, sucesso, partidas e partidas com vitória", async () => {
+    const env = await scenario();
+    const m = await microgames(env.DB, F0);
+    assert.equal(m.microgames.length, 300, "todos os 300, mesmo sem dados");
+    const swat = m.microgames.find((x) => x.id === "swat-fly")!;
+    // swat-fly: A win, B lose+lose, C win, D win+win, E win+win, F win+win, G win → 11 tentativas, 9 vitórias
+    assert.deepEqual(
+      { a: swat.attempts, w: swat.wins, l: swat.losses, p: swat.success_pct, r: swat.runs, rw: swat.runs_won },
+      { a: 11, w: 9, l: 2, p: 81.8, r: 7, rw: 6 },
+    );
+    const qd = m.microgames.find((x) => x.id === "quick-draw")!;
+    assert.deepEqual({ a: qd.attempts, w: qd.wins, r: qd.runs, rw: qd.runs_won }, { a: 5, w: 2, r: 5, rw: 2 });
+    assert.equal(m.sample.attempts, 19, "3+5+2+3+3+2 (F perdeu um)+1");
+  });
+
+  test("ranking só com amostra mínima", async () => {
+    const env = await scenario();
+    const m = await microgames(env.DB, F0);
+    const rk = ranking(m.microgames, 5);
+    assert.equal(rk.eligible, 2);
+    assert.equal(rk.easiest[0].id, "swat-fly");
+    assert.equal(rk.hardest[0].id, "quick-draw");
+  });
+
+  test("filtros: período, aparelho, versão, dificuldade", async () => {
+    const env = await scenario();
+    assert.equal((await summary(env.DB, { ...F0, device: "mobile" })).runs.total, 3);
+    assert.equal((await summary(env.DB, { ...F0, version: "v1" })).runs.total, 3);
+    assert.equal((await summary(env.DB, { ...F0, from: NOW - 30 * MIN })).runs.total, 5);
+    assert.equal((await summary(env.DB, { ...F0, to: NOW - 60 * MIN })).runs.total, 2);
+    const hard = await microgames(env.DB, { ...F0, difficulty: 2 });
+    assert.ok(hard.microgames.every((x) => x.difficulty === 2));
+  });
+
+  test("comparativos por aparelho, dificuldade, versão e tipo", async () => {
+    const env = await scenario();
+    const c = await compare(env.DB, F0);
+    const mobile = c.device.runs.find((x) => x.key === "mobile")!;
+    assert.deepEqual(
+      { runs: mobile.runs, finished: mobile.finished, voluntary: mobile.voluntary_pct, exit: mobile.exit_pct, noEnd: mobile.no_end_pct, over: mobile.over_pct },
+      { runs: 3, finished: 3, voluntary: 33.3, exit: 33.3, noEnd: 0, over: 33.3 },
+    );
+    assert.ok(c.difficulty.length >= 1);
+    assert.deepEqual(c.version.runs.map((x) => x.key).sort(), ["v1", "v2"]);
+    assert.equal(c.wtf[0].key, "");
+  });
+
+  test("CSV: escapa vírgulas, aspas e impede fórmulas", () => {
+    const csv = toCsv([{ a: "x,y", b: 'diz "oi"', c: "=1+1", d: null }]);
+    assert.equal(csv, 'a,b,c,d\r\n"x,y","diz ""oi""",\'=1+1,\r\n');
+  });
+});
+
+describe("agregação diária (cron): mesmas métricas lendo muito menos", () => {
+  const strip = (x: unknown) => JSON.parse(JSON.stringify(x));
+
+  test("depois de agregar, microgames e comparativos dão exatamente o mesmo resultado", async () => {
+    const env = await scenario();
+    const later = NOW + 86_400_000; // no dia seguinte o cron agrega o dia do cenário
+    const f: Filters = { ...F0, now: later };
+    const before = strip({ mg: await microgames(env.DB, f), cmp: await compare(env.DB, f), mob: await microgames(env.DB, { ...f, device: "mobile", difficulty: 1 }) });
+    const days = await rollup(env.DB, later);
+    assert.ok(days.includes(dayOf(NOW)));
+    assert.ok((env.DB.raw.prepare("SELECT count(*) c FROM mg_daily").get() as { c: number }).c > 0);
+    const after = strip({ mg: await microgames(env.DB, f), cmp: await compare(env.DB, f), mob: await microgames(env.DB, { ...f, device: "mobile", difficulty: 1 }) });
+    assert.deepEqual(after, before);
+  });
+
+  test("agregar de novo não duplica (idempotente) e o dia não agregado continua vindo dos eventos crus", async () => {
+    const env = await scenario();
+    const later = NOW + 86_400_000;
+    assert.deepEqual(await rollup(env.DB, later), [dayOf(NOW) - 6, dayOf(NOW) - 5, dayOf(NOW) - 4, dayOf(NOW) - 3, dayOf(NOW) - 2, dayOf(NOW) - 1, dayOf(NOW)]);
+    assert.deepEqual(await rollup(env.DB, later), [], "cada dia é agregado uma vez");
+    await env.DB.batch(rollupStatements(env.DB, dayOf(NOW), later)); // refazer à mão um dia também não duplica
+    const R = new FakeRun("v3", "tablet"); // partida de "hoje" (dia ainda não agregado)
+    await send(env, [R.start(), R.result(1, "swat-fly", "win")], later);
+    const f: Filters = { ...F0, now: later };
+    const m = await microgames(env.DB, f);
+    const swat = m.microgames.find((x) => x.id === "swat-fly")!;
+    assert.equal(swat.attempts, 12, "11 do dia agregado (uma vez só) + 1 de hoje, cru");
+    assert.equal(swat.runs, 8, "7 partidas do cenário + 1 de hoje");
+  });
+
+  test("dia = data em Brasília (UTC−3): 01:00 UTC ainda é o dia anterior", () => {
+    const t = Date.UTC(2026, 10, 22, 1, 0, 0); // 21/11 às 22:00 em Brasília
+    assert.equal(dayOf(t), dayOf(Date.UTC(2026, 10, 21, 12, 0, 0)));
+    assert.equal(dayStart(dayOf(t)), Date.UTC(2026, 10, 21, 3, 0, 0));
+  });
+
+  test("retenção apaga partidas e agregados antigos", async () => {
+    const env = await scenario();
+    await rollup(env.DB, NOW + 86_400_000);
+    await purgeOld(env.DB, NOW + 200 * 86_400_000, 180);
+    for (const t of ["runs", "mg_daily", "rollup_days"]) assert.equal((env.DB.raw.prepare(`SELECT count(*) c FROM ${t}`).get() as { c: number }).c, 0, t);
+  });
+});

@@ -251,3 +251,11 @@ html:has(.mm-page) { height: 100%; overflow: hidden; }
   .mm-card { gap: .5rem; }
   .mm-h { font-size: 3rem; }
 }
+
+/* Aviso e botão das métricas de jogo (só aparece com a telemetria ligada) */
+.mm-metrics { margin: 0.4rem 0 0; font-size: 0.78rem; display: flex; flex-wrap: wrap; gap: 0.2rem 0.7rem; align-items: center; }
+.mm-metrics-btn { font: inherit; color: inherit; background: none; border: 1px solid currentColor; border-radius: 999px; padding: 0.25rem 0.75rem; cursor: pointer; opacity: 0.85; }
+.mm-metrics-btn:hover, .mm-metrics-btn:focus-visible { opacity: 1; }
+.mm-metrics-btn[data-state="off"] { border-style: dashed; }
+.mm-metrics-btn:disabled { cursor: default; opacity: 0.6; }
+.mm-metrics a { color: inherit; opacity: 0.85; }

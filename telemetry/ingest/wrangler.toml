@@ -1,0 +1,75 @@
+# Worker PÚBLICO de ingestão — só POST /v1/events. Nada de leitura nem administração aqui.
+# Ainda NÃO publicado. Ver telemetry/README.md ("Ativação") antes de qualquer deploy.
+name = "mm-telemetry-ingest"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+# Endereço gratuito <nome>.<subdomínio>.workers.dev. Sem URLs de versão/preview (endereços alternativos).
+workers_dev = true
+preview_urls = false
+
+# Sem logs de requisição na Cloudflare (eles guardariam metadados como IP).
+[observability]
+enabled = false
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mm-telemetry"
+database_id = "b4186c83-39a2-4649-8cab-7280560600c4"   # saída de: npx wrangler d1 create mm-telemetry
+migrations_dir = "../migrations"
+
+[vars]
+ALLOWED_ORIGINS = "https://maedodeam.com.br"
+RETENTION_DAYS = "180"   # igual a retention_days em telemetry/client.config.json (o teste confere)
+
+# Limite por cliente no limitador nativo da Cloudflare (o IP não chega ao banco).
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 100, period = 10 }  # por cliente (IPv4 ou /64 IPv6) e por local; ~4 lotes por partida → folga para ~200 jogando juntos atrás do mesmo IP (CGNAT)
+
+# Teto global por local da Cloudflare (todas as requisições, uma chave só): segura abuso vindo de muitos IPs e
+# protege a cota diária do D1. ~30 req/s; o pico esperado é bem menor (ver README, "Consumo").
+[[ratelimits]]
+name = "GLOBAL_LIMITER"
+namespace_id = "1003"
+simple = { limit = 300, period = 10 }
+
+# Retenção: apaga as métricas com mais de RETENTION_DAYS dias (30–400), todo dia às 07:17 UTC (04:17 em Brasília).
+[triggers]
+crons = ["17 7 * * *"]   # 04:17 em Brasília: agrega o dia que fechou e aplica a retenção
+
+# ---------------------------------------------------------------------------------------------------------------
+# AMBIENTE DE TESTE (staging): Worker e banco separados, aceitando só o jogo rodando local (127.0.0.1:8765).
+# Publicar: npx wrangler deploy --env staging   ·   Os dados de teste nunca se misturam com os de produção.
+[env.staging]
+name = "mm-telemetry-ingest-staging"
+workers_dev = true
+preview_urls = false
+
+[env.staging.observability]
+enabled = false
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "mm-telemetry-staging"
+database_id = "dcb96219-cf94-4d3a-9926-1faa910d1f19"   # saída de: npx wrangler d1 create mm-telemetry-staging
+migrations_dir = "../migrations"
+
+[env.staging.vars]
+ALLOWED_ORIGINS = "http://127.0.0.1:8765,http://localhost:8765"
+RETENTION_DAYS = "180"
+
+[[env.staging.ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 100, period = 10 }
+
+[[env.staging.ratelimits]]
+name = "GLOBAL_LIMITER"
+namespace_id = "1004"
+simple = { limit = 300, period = 10 }
+
+# cron também no teste, para validar a agregação diária (o plano gratuito tem 5 crons por conta; usamos 2)
+[env.staging.triggers]
+crons = ["17 7 * * *"]

@@ -8,6 +8,7 @@ import { LIFE_POP_AT, Session, SPEEDUP_TIME } from "./core/session.ts";
 import type { Lang } from "./core/types.ts";
 import { CATALOG } from "./games/index.ts";
 import { Renderer, type View } from "./ui/render.ts";
+import { deviceClass, Telemetry } from "./telemetry/client.ts";
 
 const lang: Lang = document.documentElement.lang.toLowerCase().startsWith("pt") ? "pt" : "en";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -67,6 +68,12 @@ window.addEventListener(
   { capture: true, passive: true },
 );
 
+// ---------------- telemetria (opcional) ----------------
+// Só existe quando o build recebe um endereço (telemetry/client.config.json). Sem ele, TELEMETRY_URL é "" e o
+// esbuild remove tudo isto: o jogo não usa rede. Com ele, nada aqui espera a rede nem pode quebrar o jogo.
+
+const tele: Telemetry | null = TELEMETRY_URL ? new Telemetry({ endpoint: TELEMETRY_URL, version: GAME_VERSION }) : null;
+
 // ---------------- sessão ----------------
 
 const live = document.getElementById("mm-live");
@@ -83,6 +90,7 @@ const session = new Session({
   onEvent: (e) => {
     switch (e.type) {
       case "start":
+        if (TELEMETRY_URL) tele?.startRun({ lang, device: deviceClass() });
         audio.gameStart();
         break;
       case "game":
@@ -90,6 +98,22 @@ const session = new Session({
         if (live) live.textContent = `${tr(e.def.verb, lang)} — ${tr(e.def.name, lang)}`;
         break;
       case "result":
+        if (TELEMETRY_URL && tele) {
+          const r = session.runner;
+          const n = session.played + 1;
+          tele.result({
+            n,
+            mg: e.def.id,
+            result: e.result,
+            level: r ? r.api.level : 0,
+            tier: session.tier,
+            dur: r ? r.duration : 0,
+            used: r ? r.duration - r.remainingAtResult : 0,
+            lives: session.lives,
+            input: input.core.mode,
+          });
+          if (session.livesBefore !== session.lives) tele.lifeChanged({ n, from: session.livesBefore, to: session.lives, reason: "lose" });
+        }
         if (session.lives === 0) {
           audio.stopCountdown();
           audio.gameOver();
@@ -99,9 +123,11 @@ const session = new Session({
       case "speedup":
         audio.speedup(e.tier, SPEEDUP_TIME);
         if (e.life) audio.lifeUp(LIFE_POP_AT);
+        if (TELEMETRY_URL && e.life) tele?.lifeChanged({ n: session.played, from: session.lives - 1, to: session.lives, reason: "milestone" });
         if (live) live.textContent = tr(UI.speedUp, lang) + (e.life ? ` ${tr(UI.lifeUp, lang)}` : "");
         break;
       case "over":
+        if (TELEMETRY_URL) tele?.gameOver({ n: e.played, score: e.score, wins: e.cleared });
         showOver();
         break;
     }
@@ -162,6 +188,8 @@ function resume(): void {
   canvas.focus({ preventScroll: true });
 }
 function quitToTitle(): void {
+  // sair para o título no meio da partida = abandono detectado
+  if (TELEMETRY_URL && session.phase !== "over") tele?.abandon("quit", session.played);
   paused = false;
   audio.resume();
   audio.title();
@@ -203,7 +231,36 @@ fullBtn.addEventListener("click", () => {
 
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) pause();
+  // a aba pode não voltar: manda o que estiver na fila (sendBeacon), sem encerrar a partida
+  if (TELEMETRY_URL && document.hidden) tele?.flushNow(true);
 });
+// fechar ou sair da página no meio da partida = abandono detectado (sendBeacon, sem esperar resposta)
+// (Se a página só foi para o cache de voltar/avançar, ela pode voltar: aí não é abandono, só envia a fila.)
+if (TELEMETRY_URL)
+  window.addEventListener("pagehide", (e) => {
+    if (!tele) return;
+    if (e.persisted) tele.flushNow(true);
+    else if (tele.active && session.phase !== "over" && session.phase !== "title") tele.abandon("pagehide", session.played, true);
+  });
+
+// Interruptor das métricas na tela inicial (só existe na página quando a telemetria está ligada no build).
+if (TELEMETRY_URL) {
+  const btn = document.getElementById("mm-metrics") as HTMLButtonElement | null;
+  const sync = () => {
+    if (!btn || !tele) return;
+    const state = tele.browserOptOut ? "browser" : tele.userEnabled ? "on" : "off";
+    btn.textContent = btn.dataset[state] ?? "";
+    btn.setAttribute("aria-pressed", String(state === "on"));
+    btn.disabled = state === "browser";
+    btn.dataset.state = state;
+  };
+  btn?.addEventListener("click", () => {
+    if (!tele || tele.browserOptOut) return;
+    tele.setUserEnabled(!tele.userEnabled);
+    sync();
+  });
+  sync();
+}
 window.addEventListener("blur", () => {
   if (session.phase === "game" || session.phase === "between") pause();
 });

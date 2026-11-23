@@ -1,7 +1,8 @@
 // Build do jogo: um único arquivo JS minificado em assets/play/game.js (vai para o repositório, como o resto do site).
 // Uso: node game/scripts/build.ts [--dev]   (--dev também gera a galeria de desenvolvimento em game/.dev/)
 import { build } from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { GALLERY_HTML } from "../dev/gallery-page.ts";
 import { fileURLToPath } from "node:url";
@@ -30,13 +31,33 @@ const dev = process.argv.includes("--dev");
   console.log(`gravações de voz: ${entries.length}`);
 }
 
+// Telemetria (opcional): telemetry/client.config.json. Endpoint vazio = sem telemetria; o módulo nem entra no bundle.
+// TELEMETRY_CONFIG aponta outro arquivo (ex.: teste local contra o ambiente de staging), igual ao src/build.py.
+const teleCfg = JSON.parse(readFileSync(process.env.TELEMETRY_CONFIG || join(root, "telemetry/client.config.json"), "utf8")) as { endpoint?: string };
+const TELEMETRY_URL = (teleCfg.endpoint ?? "").trim();
+if (TELEMETRY_URL && !/^https:\/\/[a-z0-9.-]+(:\d+)?(\/[\w./-]*)?$/i.test(TELEMETRY_URL) && !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(TELEMETRY_URL)) {
+  console.error(`ERRO: endpoint de telemetria inválido: ${TELEMETRY_URL} (precisa ser https://...)`);
+  process.exit(1);
+}
+// versão do jogo = hash do código-fonte (identifica o build nas estatísticas)
+const srcHash = createHash("sha256");
+const walkSrc = (d: string): void => {
+  for (const f of readdirSync(d).sort()) {
+    const p = join(d, f);
+    if (statSync(p).isDirectory()) walkSrc(p);
+    else srcHash.update(f).update(readFileSync(p));
+  }
+};
+walkSrc(join(root, "game/src"));
+const GAME_VERSION = srcHash.digest("hex").slice(0, 10);
+
 const prod = await build({
   entryPoints: [join(root, "game/src/main.ts")],
   bundle: true,
   minify: true,
   format: "iife",
   target: ["es2020", "safari15", "chrome90", "firefox90"],
-  define: { BOTS: "false" },
+  define: { BOTS: "false", TELEMETRY_URL: JSON.stringify(TELEMETRY_URL), GAME_VERSION: JSON.stringify(GAME_VERSION) },
   legalComments: "none",
   write: false,
   metafile: true,
@@ -54,12 +75,22 @@ if (prev !== code) writeFileSync(out, code);
 console.log(`assets/play/game.js  ${(code.length / 1024).toFixed(1)} KB${prev === code ? " (sem mudanças)" : ""}`);
 
 // Garantias de privacidade no artefato final (o jogo não pode guardar nem enviar nada).
-const forbidden = ["localStorage", "sessionStorage", "indexedDB", "document.cookie", "serviceWorker", "sendBeacon", "XMLHttpRequest", "WebSocket", "fetch(", "caches."];
+// Sem telemetria: nenhuma API de rede. Com telemetria: só fetch/sendBeacon, e só para o endereço configurado.
+const storage = ["localStorage", "sessionStorage", "indexedDB", "document.cookie", "serviceWorker", "caches."];
+const network = ["sendBeacon", "XMLHttpRequest", "WebSocket", "fetch("];
+const forbidden = TELEMETRY_URL ? [...storage, "XMLHttpRequest", "WebSocket"] : [...storage, ...network];
 const found = forbidden.filter((f) => code.includes(f));
 if (found.length) {
   console.error("ERRO: o bundle usa APIs proibidas:", found.join(", "));
   process.exit(1);
 }
+const urls = (code.match(/https?:\/\/[^\s"'`)]+/g) ?? []).filter((u) => !u.startsWith("http://www.w3.org/"));
+const strange = urls.filter((u) => !TELEMETRY_URL || !u.startsWith(TELEMETRY_URL));
+if (strange.length) {
+  console.error("ERRO: o bundle cita endereços externos:", strange.join(", "));
+  process.exit(1);
+}
+console.log(TELEMETRY_URL ? `telemetria: LIGADA → ${TELEMETRY_URL} (versão ${GAME_VERSION})` : "telemetria: desligada (sem rede)");
 
 if (dev) {
   await build({
