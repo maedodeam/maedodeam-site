@@ -1,5 +1,5 @@
 {
-  "endpoint": "",
-  "policy_date": "",
+  "endpoint": "https://mm-telemetry-ingest.maedodeam.workers.dev",
+  "policy_date": "2026-11-23",
   "retention_days": 180
 }

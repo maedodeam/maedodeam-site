@@ -243,7 +243,8 @@ milhão de linhas (~3 cargas/dia no gratuito); com 2 mil partidas/dia, ~0,2 milh
 | Access | Worker inteiro (All traffic), política `somente-dono-telemetria` (só o seu e-mail) + `ALLOWED_EMAILS` | idem (mesma política, aplicação própria com AUD próprio) |
 | login | `databairro.cloudflareaccess.com` (time Zero Trust já existente na conta) | idem |
 
-Os Workers estão publicados, mas **o jogo não envia nada**: `client.config.json` continua com `endpoint` vazio.
+**Coleta ativada em 23/11/2026:** `client.config.json` aponta para a ingestão de produção; o jogo publicado só fala
+com esse endereço (CSP). Para desligar: `endpoint` vazio, `npm run build` e publicar de novo.
 
 ## Ativação (só com a sua autorização final)
 

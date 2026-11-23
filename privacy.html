@@ -897,6 +897,82 @@
       (telemetry/client.config.json). Desligada, o bloco fica vazio.
     -->
 <!-- build:telemetry -->
+    <!--
+      Política do Microgame Mayhem (telemetria de gameplay). Aprovada para publicar junto com a ativação da telemetria.
+      Gerada por src/build.py só quando telemetry/client.config.json tem um endpoint; data e retenção vêm de lá.
+      Âncoras próprias (#microgame-mayhem, #microgame-mayhem-pt, #microgame-mayhem-en): não reutilizar as do Escritório 17h58.
+    -->
+    <section id="microgame-mayhem" aria-label="Microgame Mayhem">
+      <h2 class="label" style="margin-top: 3rem">Microgame Mayhem</h2>
+
+      <article class="policy" id="microgame-mayhem-pt" lang="pt-BR">
+        <h2>Microgame Mayhem — estatísticas de gameplay</h2>
+        <p class="muted">Última atualização: 23/11/2026</p>
+        <p>O Microgame Mayhem (maedodeam.com.br/play) é um jogo de navegador da MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA, controladora dos dados descritos aqui.</p>
+
+        <h3>O que é coletado</h3>
+        <p>Para equilibrar a dificuldade das fases, o jogo envia estatísticas de gameplay — sem conta, sem cookies e sem identificação pessoal:</p>
+        <ul>
+          <li>o início e o fim de cada partida (fim de jogo, ou saída no meio da partida);</li>
+          <li>cada fase jogada: qual fase, se venceu ou perdeu, o tempo usado, o nível de dificuldade e as vidas restantes;</li>
+          <li>a versão do jogo, o idioma (português ou inglês), um tipo de aparelho genérico (celular, tablet ou computador) e o tipo de controle (mouse, toque ou teclado).</li>
+        </ul>
+        <p>Cada partida recebe um código aleatório criado na hora. Ele não é gravado no seu aparelho, muda a cada partida e não identifica você nem o seu aparelho. Por isso as estatísticas contam partidas, não pessoas.</p>
+
+        <h3>O que não é coletado</h3>
+        <p>O jogo não pede nem coleta nome, e-mail, conta, localização, identificadores do aparelho, impressão digital do navegador, nem nada que você digite. Não usa cookies e não guarda nada no seu aparelho (nem localStorage, sessionStorage ou IndexedDB). Não há publicidade nem perfis.</p>
+
+        <h3>Para que usamos</h3>
+        <p>Só para melhorar o jogo: encontrar fases fáceis ou difíceis demais, comparar versões do jogo e entender onde as partidas terminam. A base legal é o legítimo interesse da MAEDODEAM em manter o jogo equilibrado (LGPD, art. 7º, IX), avaliado em um teste de balanceamento que considera as suas expectativas e os seus direitos.</p>
+
+        <h3>Como desligar</h3>
+        <ul>
+          <li>Na tela inicial do jogo, use o botão “Estatísticas de gameplay”. Desligar vale na hora e até você fechar a página (como o jogo não guarda nada no seu aparelho, ele não consegue lembrar a escolha depois).</li>
+          <li>Para desligar sempre, ative o “Global Privacy Control” ou o “Do Not Track” do navegador: com eles, o jogo não envia nada.</li>
+          <li>Desligar não muda nada no jogo.</li>
+        </ul>
+
+        <h3>Onde os dados ficam e por quanto tempo</h3>
+        <p>As estatísticas são enviadas à Cloudflare, que opera o serviço de recebimento e o banco de dados para a MAEDODEAM (operadora) e pode processá-las fora do Brasil. Para entregar a conexão, o seu endereço IP chega à Cloudflare; ele é usado só para limitar o volume de envios e não é guardado no nosso banco. As estatísticas são apagadas automaticamente depois de 180 dias.</p>
+
+        <h3>Seus direitos</h3>
+        <p>Como as estatísticas não identificam ninguém, não é possível localizar quais partidas são suas. Para dúvidas ou pedidos sobre esta coleta, use o contato no fim desta página.</p>
+      </article>
+
+      <article class="policy" id="microgame-mayhem-en" lang="en">
+        <h2>Microgame Mayhem — gameplay statistics</h2>
+        <p class="muted">Last updated: November 23, 2026</p>
+        <p>Microgame Mayhem (maedodeam.com.br/play) is a browser game by MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA, the controller of the data described here.</p>
+
+        <h3>What is collected</h3>
+        <p>To balance the difficulty of the microgames, the game sends gameplay statistics — no account, no cookies and no personal identification:</p>
+        <ul>
+          <li>the start and end of each match (game over, or leaving in the middle of a match);</li>
+          <li>each microgame played: which one, win or loss, time used, difficulty level and remaining lives;</li>
+          <li>the game version, the language (Portuguese or English), a generic device type (phone, tablet or computer) and the input type (mouse, touch or keyboard).</li>
+        </ul>
+        <p>Each match gets a random code created on the spot. It is not stored on your device, changes every match and does not identify you or your device. That is why the statistics count matches, not people.</p>
+
+        <h3>What is not collected</h3>
+        <p>The game does not ask for or collect your name, email, account, location, device identifiers, browser fingerprint, or anything you type. It uses no cookies and stores nothing on your device (no localStorage, sessionStorage or IndexedDB). No advertising, no profiles.</p>
+
+        <h3>What we use it for</h3>
+        <p>Only to improve the game: finding microgames that are too easy or too hard, comparing game versions and understanding where matches end. The legal basis is MAEDODEAM's legitimate interest in keeping the game balanced (Brazilian LGPD, art. 7, IX), assessed in a balancing test that weighs your expectations and rights.</p>
+
+        <h3>How to turn it off</h3>
+        <ul>
+          <li>On the game's title screen, use the “Gameplay stats” button. Turning it off takes effect immediately and lasts until you close the page (since the game stores nothing on your device, it cannot remember the choice afterwards).</li>
+          <li>To turn it off for good, enable “Global Privacy Control” or “Do Not Track” in your browser: with them, the game sends nothing.</li>
+          <li>Turning it off changes nothing in the game.</li>
+        </ul>
+
+        <h3>Where the data is kept and for how long</h3>
+        <p>The statistics are sent to Cloudflare, which runs the receiving service and the database for MAEDODEAM (as processor) and may process them outside Brazil. To deliver the connection, your IP address reaches Cloudflare; it is used only to rate-limit submissions and is not stored in our database. The statistics are deleted automatically after 180 days.</p>
+
+        <h3>Your rights</h3>
+        <p>Because the statistics do not identify anyone, it is not possible to find which matches are yours. For questions or requests about this collection, use the contact at the end of this page.</p>
+      </article>
+    </section>
 <!-- /build:telemetry -->
 
     <section id="contato" aria-labelledby="contato-titulo">
@@ -947,7 +1023,7 @@
     </div>
     <div class="legal">
       <p>© 2026 MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA</p>
-      <p class="mono">Static HTML · No cookies · No trackers</p>
+      <p class="mono">Static HTML · No cookies · Gameplay stats in the game only</p>
     </div>
   </div>
   <p class="wordmark" aria-hidden="true">MAEDODEAM<span>_</span></p>

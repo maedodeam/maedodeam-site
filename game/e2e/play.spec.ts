@@ -1,6 +1,25 @@
 // Ponta a ponta do jogo: carregamento, partida completa até o fim, reinício, pausa, teclado, idiomas,
 // redimensionamento, privacidade (sem rede depois de carregar, sem armazenamento) e ausência de erros.
 import { test, expect, type Page } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseBatch } from "../../telemetry/shared/validate.ts";
+
+// Telemetria: o endereço configurado é interceptado em TODOS os testes (nada sai para o serviço real) e cada lote
+// enviado fica registrado aqui para conferir que é exatamente o contrato aceito pelo servidor.
+const TELEMETRY = (JSON.parse(readFileSync(join(process.cwd(), "telemetry", "client.config.json"), "utf8")).endpoint ?? "").trim();
+type Sent = { url: string; method: string; body: string };
+let sent: Sent[] = [];
+test.beforeEach(async ({ context }) => {
+  sent = [];
+  if (!TELEMETRY) return;
+  await context.route(`${TELEMETRY}/**`, async (route) => {
+    const r = route.request();
+    sent.push({ url: r.url(), method: r.method(), body: r.postData() ?? "" });
+    const origin = (await r.headerValue("origin")) ?? "*";
+    await route.fulfill({ status: 204, headers: { "access-control-allow-origin": origin, vary: "Origin" } });
+  });
+});
 
 /** Registra qualquer tentativa de guardar dados (antes de o jogo carregar). */
 async function spyStorage(page: Page): Promise<void> {
@@ -80,7 +99,9 @@ test("partida completa: joga até perder as 4 vidas, vê o fim, joga de novo —
   const errs = trackErrors(page);
   await openGame(page);
   const requests: string[] = [];
-  page.on("request", (r) => requests.push(r.url()));
+  page.on("request", (r) => {
+    if (!TELEMETRY || !r.url().startsWith(TELEMETRY + "/")) requests.push(r.url());
+  });
 
   await press(page, "#mm-play");
   await expect(page.locator("#mm")).toHaveAttribute("data-screen", "game");
@@ -96,7 +117,25 @@ test("partida completa: joga até perder as 4 vidas, vê o fim, joga de novo —
   await expect(page.locator("#mm")).toHaveAttribute("data-screen", "game");
   await page.waitForTimeout(2500);
 
-  expect(requests, "nenhuma requisição depois do carregamento").toEqual([]);
+  expect(requests, "nenhuma requisição depois do carregamento (fora a telemetria)").toEqual([]);
+  if (TELEMETRY) {
+    // só POST para /v1/events, cada corpo um lote válido de UMA partida; as duas partidas começam e a primeira termina
+    expect(sent.length).toBeGreaterThan(0);
+    const types: string[] = [];
+    for (const x of sent) {
+      expect(x.url).toBe(`${TELEMETRY}/v1/events`);
+      expect(x.method).toBe("POST");
+      const b = parseBatch(x.body);
+      expect(b, x.body.slice(0, 200)).not.toBeNull();
+      expect(b!.rejected).toBe(0);
+      expect(new Set(b!.events.map((e) => e.run)).size).toBe(1);
+      types.push(...b!.events.map((e) => e.type));
+    }
+    expect(types.filter((t) => t === "game_over")).toHaveLength(1);
+    expect(types).toContain("microgame_result");
+  } else {
+    expect(sent).toEqual([]);
+  }
   expect(await page.evaluate(() => (window as unknown as { __storage: string[] }).__storage)).toEqual([]);
   expect(await context.cookies()).toEqual([]);
   expect(errs).toEqual([]);

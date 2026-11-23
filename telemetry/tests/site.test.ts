@@ -27,14 +27,24 @@ const ON = { endpoint: "https://mm-telemetry-ingest.exemplo.workers.dev", policy
 const OFF_TEXTS = ["Fechou a página, sumiu", "Close the page and it's gone", "nada salvo", "no saves", "Sem rastreadores", "No trackers"];
 const ESCRITORIO_ANCHORS = ["pt-BR", "en", "es", "fr", "ja", "ko", "zh-CN", "escritorio-17h58", "contato"];
 
-test("configuração atual: telemetria desligada (nada de coleta, aviso, botão nem seção na política)", () => {
-  assert.equal(CURRENT.endpoint, "", "a branch não pode ir para produção com a telemetria ligada sem autorização");
-  const play = page("pt-br/play/index.html");
-  assert.match(play, /connect-src 'none'/);
-  assert.ok(!play.includes("mm-metrics"), "sem botão de métricas");
-  assert.ok(play.includes("Nada fica guardado. Fechou a página, sumiu."));
+// Ativação autorizada em 2026-11-23: a configuração do repositório só pode apontar para a ingestão de produção.
+const PROD = "https://mm-telemetry-ingest.maedodeam.workers.dev";
+
+test("configuração atual: ligada só para a ingestão de produção, com aviso, botão e seção na política", () => {
+  assert.equal(CURRENT.endpoint, PROD, "o jogo publicado só pode enviar para a ingestão de produção");
+  assert.match(CURRENT.policy_date, /^\d{4}-\d{2}-\d{2}$/);
+  for (const rel of ["play/index.html", "pt-br/play/index.html"]) {
+    const play = page(rel);
+    assert.ok(play.includes(`connect-src ${PROD};`), `${rel}: CSP só com a ingestão`);
+    assert.match(play, /<button id="mm-metrics"[^>]+aria-pressed="true"/, `${rel}: botão para desligar`);
+    for (const t of OFF_TEXTS) assert.ok(!play.includes(t), `${rel}: texto incoerente com a coleta: "${t}"`);
+    assert.equal(play, readFileSync(join(root, rel), "utf8").replace(/\r\n/g, "\n"), `${rel} em dia com a configuração`);
+  }
+  for (const rel of ["index.html", "pt-br/index.html", "support.html", "pt-br/support.html", "404.html"]) {
+    assert.match(readFileSync(join(root, rel), "utf8"), /connect-src 'none'/, `${rel}: só a página do jogo fala com a rede`);
+  }
   const pp = page("privacy.html");
-  assert.ok(!pp.includes('id="microgame-mayhem"'), "a seção só entra com a ativação");
+  assert.ok(pp.includes('id="microgame-mayhem"'), "seção do Microgame Mayhem na política");
   assert.equal(pp, readFileSync(join(root, "privacy.html"), "utf8").replace(/\r\n/g, "\n"), "privacy.html em dia e idêntica");
 });
 
