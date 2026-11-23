@@ -173,7 +173,7 @@ async function load() {
   const csv = (kind) => "/api/export.csv?" + new URLSearchParams([...query(), ["kind", kind]]).toString();
   $("csv-mg").href = csv("microgames"); $("csv-runs").href = csv("runs"); $("csv-levels").href = csv("levels");
   const [s, m, c] = await Promise.all([get("/api/summary"), get("/api/microgames"), get("/api/compare")]);
-  $("who").textContent = "Acesso: " + s.user + " · horários em UTC · abandono presumido após " + s.abandon_after_min + " min sem eventos";
+  $("who").textContent = "Acesso: " + s.user + " · horários de Brasília · abandono presumido após " + s.abandon_after_min + " min sem eventos";
   const r = s.runs;
   $("n-summary").textContent = "n = " + r.total + " partidas (" + r.finished + " sem atividade recente, " + r.in_progress + " em andamento)";
   $("cards").replaceChildren(
@@ -231,7 +231,7 @@ form.addEventListener("submit", (e) => { e.preventDefault(); load().catch((err) 
 $("mg-filter").addEventListener("input", renderMg);
 // Abre nos últimos 7 dias: sem período, cada carga lê as tabelas inteiras (o D1 gratuito lê 5 milhões de linhas/dia).
 const fromInput = form.elements.namedItem("from");
-if (!fromInput.value) fromInput.value = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+if (!fromInput.value) fromInput.value = new Date(Date.now() - 3 * 36e5 - 6 * 864e5).toISOString().slice(0, 10); // data de Brasília (UTC−3)
 loadVersions();
 load().catch((err) => alert("Erro ao carregar: " + err.message));
 `;

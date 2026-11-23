@@ -116,7 +116,8 @@ e número, dificuldade e tipo WTF vêm desse catálogo.
 ## Métricas do dashboard
 
 Toda métrica mostra o tamanho da amostra. Filtros: período (dias inteiros pelo início da partida, horário de
-Brasília; abre nos últimos 7 dias), aparelho, dificuldade (estatísticas por microgame) e versão.
+Brasília; abre nos últimos 7 dias), aparelho, dificuldade (estatísticas por microgame) e versão. Todos os horários
+do dashboard e dos CSVs ficam em Brasília (UTC−3; no CSV, `2026-11-22T21:30:00.000-03:00`).
 
 - Tudo conta **partidas** (sessões), nunca pessoas: não há identificador de jogador, logo não há "jogadores únicos".
 - Partidas iniciadas; Game Over; abandono voluntário; saída detectada; sem fim registrado (presumido / falha de envio), em número e %.
@@ -239,7 +240,7 @@ milhão de linhas (~3 cargas/dia no gratuito); com 2 mil partidas/dia, ~0,2 milh
 | ingestão | `https://mm-telemetry-ingest-staging.maedodeam.workers.dev` (aceita só `http://127.0.0.1:8765` e `http://localhost:8765`) | `https://mm-telemetry-ingest.maedodeam.workers.dev` (aceita só `https://maedodeam.com.br`) |
 | dashboard | `https://mm-telemetry-dashboard-staging.maedodeam.workers.dev` | `https://mm-telemetry-dashboard.maedodeam.workers.dev` |
 | D1 | `mm-telemetry-staging` | `mm-telemetry` |
-| Access | política "Cloudflare account" (membros da conta) + `ALLOWED_EMAILS` | política `somente-dono-telemetria` (só o seu e-mail) + `ALLOWED_EMAILS` |
+| Access | Worker inteiro (All traffic), política `somente-dono-telemetria` (só o seu e-mail) + `ALLOWED_EMAILS` | idem (mesma política, aplicação própria com AUD próprio) |
 | login | `databairro.cloudflareaccess.com` (time Zero Trust já existente na conta) | idem |
 
 Os Workers estão publicados, mas **o jogo não envia nada**: `client.config.json` continua com `endpoint` vazio.

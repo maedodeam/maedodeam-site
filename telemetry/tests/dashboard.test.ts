@@ -2,7 +2,7 @@
 // em nenhuma rota (página, API, CSV, caminhos desconhecidos). Falha fechada sem configuração.
 import { describe, test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { handle, type Env } from "../dashboard/src/index.ts";
+import { brasilia, handle, type Env } from "../dashboard/src/index.ts";
 import { PAGE_HTML, APP_JS } from "../dashboard/src/page.ts";
 import { _resetCertCache } from "../dashboard/src/access.ts";
 import { SqliteD1 } from "./sqlite-d1.ts";
@@ -137,5 +137,16 @@ describe("dashboard: partidas não são jogadores", () => {
       assert.ok(!APP_JS.toLowerCase().includes(word), `métrica com "${word}"`);
     }
     assert.match(APP_JS, /partidas, não jogadores/);
+  });
+});
+
+describe("dashboard: horários de Brasília", () => {
+  test("CSV usa o horário de Brasília com o fuso explícito", () => {
+    assert.equal(brasilia(Date.UTC(2026, 10, 23, 0, 30)), "2026-11-22T21:30:00.000-03:00");
+    assert.equal(Date.parse(brasilia(NOW)), NOW);
+  });
+  test("a página diz que os horários são de Brasília", () => {
+    assert.match(APP_JS, /horários de Brasília/);
+    assert.doesNotMatch(APP_JS, /UTC ·/);
   });
 });

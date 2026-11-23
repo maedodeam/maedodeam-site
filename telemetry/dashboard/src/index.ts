@@ -5,6 +5,10 @@ import type { D1Database } from "../../shared/d1.ts";
 import { compare, microgames, ranking, summary, toCsv, versions, type Filters } from "../../shared/stats.ts";
 import { verifyAccess, type AccessEnv } from "./access.ts";
 import { APP_CSS, APP_JS, PAGE_HTML } from "./page.ts";
+import { TZ_OFFSET_MS } from "../../shared/store.ts";
+
+/** Horário de Brasília em ISO 8601 com o fuso explícito, ex.: 2026-11-22T21:30:00.000-03:00. */
+export const brasilia = (ms: number) => new Date(ms - TZ_OFFSET_MS).toISOString().replace("Z", "-03:00");
 
 export interface Env extends AccessEnv {
   DB: D1Database;
@@ -115,7 +119,7 @@ async function exportRuns(db: D1Database, f: Filters): Promise<Record<string, un
     )
     .bind(cut, cut, ...a)
     .all<Record<string, unknown> & { started_at: number }>();
-  return r.results.map((x) => ({ ...x, started_at: new Date(x.started_at).toISOString() }));
+  return r.results.map((x) => ({ ...x, started_at: brasilia(x.started_at) }));
 }
 
 export default {
