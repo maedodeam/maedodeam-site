@@ -239,6 +239,8 @@
     "newbest": "New session best!",
     "lostto": "Taken out by",
     "again": "Play again",
+    "skills": "Your profile this match",
+    "skillsnote": "Just for fun: it shows how this match's levels went, not a measure of real-world skills. Number = levels counted.",
     "cta_label": "Coffee break",
     "cta_title": "Microgame Mayhem",
     "cta_text": "300 tiny games built in-house. Four lives, no saves, and each game lasts about as long as your attention span. Works with mouse, keyboard or touch.",

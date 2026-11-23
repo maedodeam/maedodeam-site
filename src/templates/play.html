@@ -59,17 +59,27 @@
   </section>
 
   <section id="mm-over" class="mm-screen mm-card" aria-labelledby="mm-over-h" hidden>
-    <h2 id="mm-over-h" class="mm-h">{{t.play.gameover}}</h2>
-    <p class="mm-score"><span class="mm-label">{{t.play.score}}</span> <strong id="mm-score">0</strong></p>
-    <p class="mm-newbest" id="mm-newbest" hidden>{{t.play.newbest}}</p>
-    <dl class="mm-stats">
-      <div><dt>{{t.play.cleared}}</dt><dd id="mm-cleared">0</dd></div>
-      <div><dt>{{t.play.played}}</dt><dd id="mm-played">0</dd></div>
-      <div><dt>{{t.play.best}}</dt><dd id="mm-best">0</dd></div>
-    </dl>
-    <p class="mm-lostto"><span class="mm-label">{{t.play.lostto}}</span> <span id="mm-lostto">—</span></p>
-    <button id="mm-again" class="mm-btn mm-btn--play" type="button">{{t.play.again}}</button>
-    <a class="mm-back" href="{{page.home}}">{{t.play.back}}</a>
+    <div class="mm-over-main">
+      <h2 id="mm-over-h" class="mm-h">{{t.play.gameover}}</h2>
+      <p id="mm-quip" class="mm-quip" hidden></p>
+      <p class="mm-score"><span class="mm-label">{{t.play.score}}</span> <strong id="mm-score">0</strong></p>
+      <p class="mm-newbest" id="mm-newbest" hidden>{{t.play.newbest}}</p>
+      <dl class="mm-stats">
+        <div><dt>{{t.play.cleared}}</dt><dd id="mm-cleared">0</dd></div>
+        <div><dt>{{t.play.played}}</dt><dd id="mm-played">0</dd></div>
+        <div><dt>{{t.play.best}}</dt><dd id="mm-best">0</dd></div>
+      </dl>
+      <p class="mm-lostto"><span class="mm-label">{{t.play.lostto}}</span> <span id="mm-lostto">—</span></p>
+      <button id="mm-again" class="mm-btn mm-btn--play" type="button">{{t.play.again}}</button>
+      <a class="mm-back" href="{{page.home}}">{{t.play.back}}</a>
+    </div>
+    <figure id="mm-skills" class="mm-skills" hidden>
+      <figcaption class="mm-label">{{t.play.skills}}</figcaption>
+      <div id="mm-radar" class="mm-radar"></div>
+      <p id="mm-skill-sum" class="mm-skill-sum"></p>
+      <p id="mm-skill-thin" class="mm-skill-thin" hidden></p>
+      <p class="mm-skill-note">{{t.play.skillsnote}}</p>
+    </figure>
   </section>
 
   <p id="mm-live" class="vh" aria-live="polite"></p>
