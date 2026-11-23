@@ -111,6 +111,12 @@ test("partida completa: joga até perder as 4 vidas, vê o fim, joga de novo —
   await expect(page.locator("#mm-score")).toHaveText(/^\d+$/);
   expect(Number(await page.locator("#mm-played").textContent())).toBeGreaterThanOrEqual(4);
   await expect(page.locator("#mm-lostto")).not.toHaveText("—");
+  // frase do narrador + perfil da partida, sem empurrar o botão de jogar de novo para fora da tela
+  await expect(page.locator("#mm-quip")).toBeVisible();
+  await expect(page.locator("#mm-quip")).toHaveText(/\S{2,}/);
+  await expect(page.locator("#mm-skills")).toBeVisible();
+  await expect(page.locator("#mm-skill-sum")).toHaveText(/\S/);
+  await expect(page.locator("#mm-again")).toBeInViewport({ ratio: 1 });
 
   await press(page, "#mm-again");
   await expect(page.locator("#mm-over")).toBeHidden();

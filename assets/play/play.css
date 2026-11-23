@@ -259,3 +259,124 @@ html:has(.mm-page) { height: 100%; overflow: hidden; }
 .mm-metrics-btn[data-state="off"] { border-style: dashed; }
 .mm-metrics-btn:disabled { cursor: default; opacity: 0.6; }
 .mm-metrics a { color: inherit; opacity: 0.85; }
+
+/* ---------- Game Over: frase do narrador e perfil de habilidades da partida ---------- */
+/* Retrato: uma coluna (frase, placar, radar, botões). Paisagem: resultado à esquerda, radar à direita.
+   O botão de jogar de novo fica sempre visível sem rolar; se a tela for pequena demais, o cartão rola. */
+#mm-over {
+  gap: .55rem;
+  overflow-y: auto;
+  justify-content: safe center;
+  padding-block: 1rem;
+}
+.mm-over-main { display: contents; }
+#mm-over .mm-h { margin: 0; font-size: clamp(2.5rem, 10vw, 5.5rem); }
+#mm-over .mm-lostto { margin: 0; }
+#mm-over .mm-skills { order: 1; }
+#mm-over #mm-again, #mm-over .mm-back { order: 2; }
+#mm-over #mm-again { margin-top: .35rem; }
+
+.mm-quip {
+  margin: 0 0 .2rem;
+  max-width: 30ch;
+  padding: .3em .55em .35em;
+  border-radius: 10px;
+  background: var(--yellow, #ffc83d);
+  color: var(--bg);
+  box-shadow: 4px 5px 0 var(--text);
+  font-family: var(--display);
+  font-weight: 900;
+  font-stretch: 70%;
+  text-transform: uppercase;
+  font-size: clamp(1.1rem, 4.6vw, 1.85rem);
+  line-height: 1.02;
+  letter-spacing: .01em;
+  text-wrap: balance;
+  transform: rotate(-2deg);
+  animation: mm-quip-in .55s cubic-bezier(.2, 1.6, .4, 1) .12s both;
+}
+.mm-quip[hidden] { display: none; }
+@keyframes mm-quip-in {
+  0% { opacity: 0; transform: scale(2.3) rotate(-9deg); }
+  60% { opacity: 1; transform: scale(.94) rotate(1deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-2deg); }
+}
+
+.mm-skills { margin: 0; display: grid; justify-items: center; gap: .3rem; width: min(100%, 26rem); }
+.mm-skills[hidden] { display: none; }
+.mm-radar { width: 100%; display: grid; justify-items: center; }
+.mm-radar[data-kind="none"] { display: none; }
+.mm-radar-svg { display: block; width: min(100%, 22rem); height: auto; max-height: 29dvh; overflow: visible; }
+.mm-radar-grid polygon, .mm-radar-grid line { fill: none; stroke: var(--line-2); stroke-width: 1; }
+.mm-radar-shape { animation: mm-radar-in .5s cubic-bezier(.2, 1.4, .4, 1) .3s both; }
+.mm-radar-shape polygon { fill: color-mix(in srgb, var(--accent) 32%, transparent); stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+.mm-radar-shape circle { fill: var(--accent); stroke: var(--bg); stroke-width: 1.5; }
+@keyframes mm-radar-in { from { transform: scale(0) rotate(-40deg); } to { transform: scale(1) rotate(0); } }
+.mm-radar-name { fill: var(--text); font-family: var(--display); font-weight: 800; font-stretch: 80%; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.mm-radar-val { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+
+.mm-skill-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; width: min(100%, 21rem); }
+.mm-skill-bars li { display: grid; grid-template-columns: 7rem 1fr 4.2rem; align-items: center; gap: .55rem; font-size: .8rem; }
+.mm-skill-bar-name { text-align: right; font-weight: 700; }
+.mm-skill-bar { height: .6rem; border-radius: 99px; background: var(--line-2); overflow: hidden; }
+.mm-skill-bar-fill { display: block; height: 100%; width: var(--v, 0%); border-radius: inherit; background: var(--accent); transform-origin: left; animation: mm-bar-in .5s ease-out .3s both; }
+@keyframes mm-bar-in { from { transform: scaleX(0); } }
+.mm-skill-bar-val { text-align: left; font-family: var(--mono); color: var(--muted); }
+
+.mm-skill-sum { margin: 0; font-weight: 700; font-size: .95rem; }
+.mm-skill-thin, .mm-skill-note { margin: 0; max-width: 36ch; color: var(--faint); font-family: var(--mono); font-size: .6875rem; line-height: 1.35; }
+
+@media (orientation: landscape) and (min-width: 640px) {
+  #mm-over { flex-direction: row; align-items: center; justify-content: safe center; gap: clamp(1rem, 4vw, 3.5rem); }
+  .mm-over-main { display: flex; flex-direction: column; align-items: center; gap: .55rem; min-width: 0; flex: 0 1 30rem; }
+  #mm-over .mm-skills { flex: 0 1 28rem; width: auto; }
+  .mm-radar-svg { width: min(100%, 26rem); max-height: 58dvh; }
+}
+/* Telas baixas: tudo mais compacto para o botão de jogar de novo caber sem rolar. */
+@media (orientation: portrait) and (max-height: 740px) {
+  #mm-over { gap: .38rem; padding-block: .6rem; }
+  #mm-over .mm-h { font-size: clamp(2.1rem, 9vw, 3rem); }
+  .mm-quip { font-size: clamp(.95rem, 4.3vw, 1.25rem); }
+  #mm-over .mm-score strong { font-size: 2.1rem; line-height: 1; }
+  #mm-over .mm-newbest { font-size: .8rem; padding: .15rem .65rem; }
+  #mm-over .mm-stats dd { font-size: 1.15rem; }
+  #mm-over .mm-lostto { font-size: .95rem; }
+  .mm-radar-svg { max-height: 23dvh; }
+  .mm-radar-name { font-size: 17px; }
+  .mm-radar-val { font-size: 15px; }
+  .mm-skill-sum { font-size: .85rem; }
+  .mm-skill-note { display: none; }
+  #mm-over #mm-again { font-size: 1.6rem; margin-top: .15rem; }
+}
+@media (orientation: portrait) and (max-height: 600px) {
+  #mm-over { gap: .3rem; padding-block: .4rem; }
+  #mm-over .mm-h { font-size: 2rem; }
+  #mm-over .mm-score .mm-label, #mm-over .mm-skills > .mm-label { display: none; }
+  #mm-over .mm-score strong { font-size: 1.9rem; }
+  #mm-over .mm-stats dd { font-size: 1.05rem; }
+  .mm-radar-svg { max-height: 22dvh; }
+  .mm-skill-sum { font-size: .8rem; }
+  #mm-over #mm-again { font-size: 1.45rem; }
+}
+@media (orientation: portrait) and (max-width: 340px) {
+  .mm-radar-name { font-size: 15px; }
+  .mm-radar-val { font-size: 13px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  #mm-over { padding-block: .35rem; }
+  #mm-over, .mm-over-main { gap: .28rem; }
+  #mm-over .mm-h { font-size: 2.1rem; }
+  .mm-quip { font-size: .95rem; box-shadow: 3px 3px 0 var(--text); }
+  #mm-over .mm-score strong { font-size: 2rem; line-height: 1; }
+  #mm-over .mm-newbest { font-size: .75rem; padding: .1rem .6rem; }
+  #mm-over .mm-stats dt { font-size: .6rem; }
+  #mm-over .mm-stats dd { font-size: 1.1rem; }
+  #mm-over .mm-lostto { font-size: .95rem; }
+  #mm-over #mm-again { font-size: 1.4rem; margin-top: .1rem; }
+  .mm-skill-note { display: none; }
+  .mm-radar-svg { max-height: 72dvh; }
+}
+}
+@media (prefers-reduced-motion: reduce) {
+  .mm-quip, .mm-radar-shape, .mm-skill-bar-fill { animation: none; }
+}

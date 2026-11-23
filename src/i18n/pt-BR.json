@@ -239,6 +239,8 @@
     "newbest": "Novo recorde da sessão!",
     "lostto": "Derrotado por",
     "again": "Jogar de novo",
+    "skills": "Seu perfil nesta partida",
+    "skillsnote": "Só diversão: mostra como foram as fases desta partida, não mede habilidades reais. Número ao lado = fases avaliadas.",
     "cta_label": "Pausa pro café",
     "cta_title": "Microgame Mayhem",
     "cta_text": "300 joguinhos feitos aqui dentro. Quatro vidas, nada salvo, e cada jogo dura mais ou menos o tempo da sua atenção. Funciona com mouse, teclado ou toque.",

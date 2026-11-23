@@ -33,8 +33,8 @@
 <link rel="preload" href="../../assets/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="../../assets/fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../../assets/site.css?v=13e8bdb9">
-<link rel="stylesheet" href="../../assets/play/play.css?v=cd4cfe11">
-<script src="../../assets/play/game.js?v=cd4cfe11" defer></script>
+<link rel="stylesheet" href="../../assets/play/play.css?v=2ccebac4">
+<script src="../../assets/play/game.js?v=2ccebac4" defer></script>
 </head>
 <body class="mm-page">
 <div id="mm" class="mm" data-screen="title" data-phase="title">
@@ -78,17 +78,27 @@
   </section>
 
   <section id="mm-over" class="mm-screen mm-card" aria-labelledby="mm-over-h" hidden>
-    <h2 id="mm-over-h" class="mm-h">Fim de jogo</h2>
-    <p class="mm-score"><span class="mm-label">Pontos</span> <strong id="mm-score">0</strong></p>
-    <p class="mm-newbest" id="mm-newbest" hidden>Novo recorde da sessão!</p>
-    <dl class="mm-stats">
-      <div><dt>Vencidos</dt><dd id="mm-cleared">0</dd></div>
-      <div><dt>Jogados</dt><dd id="mm-played">0</dd></div>
-      <div><dt>Recorde desta sessão</dt><dd id="mm-best">0</dd></div>
-    </dl>
-    <p class="mm-lostto"><span class="mm-label">Derrotado por</span> <span id="mm-lostto">—</span></p>
-    <button id="mm-again" class="mm-btn mm-btn--play" type="button">Jogar de novo</button>
-    <a class="mm-back" href="../">Voltar para a MAEDODEAM</a>
+    <div class="mm-over-main">
+      <h2 id="mm-over-h" class="mm-h">Fim de jogo</h2>
+      <p id="mm-quip" class="mm-quip" hidden></p>
+      <p class="mm-score"><span class="mm-label">Pontos</span> <strong id="mm-score">0</strong></p>
+      <p class="mm-newbest" id="mm-newbest" hidden>Novo recorde da sessão!</p>
+      <dl class="mm-stats">
+        <div><dt>Vencidos</dt><dd id="mm-cleared">0</dd></div>
+        <div><dt>Jogados</dt><dd id="mm-played">0</dd></div>
+        <div><dt>Recorde desta sessão</dt><dd id="mm-best">0</dd></div>
+      </dl>
+      <p class="mm-lostto"><span class="mm-label">Derrotado por</span> <span id="mm-lostto">—</span></p>
+      <button id="mm-again" class="mm-btn mm-btn--play" type="button">Jogar de novo</button>
+      <a class="mm-back" href="../">Voltar para a MAEDODEAM</a>
+    </div>
+    <figure id="mm-skills" class="mm-skills" hidden>
+      <figcaption class="mm-label">Seu perfil nesta partida</figcaption>
+      <div id="mm-radar" class="mm-radar"></div>
+      <p id="mm-skill-sum" class="mm-skill-sum"></p>
+      <p id="mm-skill-thin" class="mm-skill-thin" hidden></p>
+      <p class="mm-skill-note">Só diversão: mostra como foram as fases desta partida, não mede habilidades reais. Número ao lado = fases avaliadas.</p>
+    </figure>
   </section>
 
   <p id="mm-live" class="vh" aria-live="polite"></p>

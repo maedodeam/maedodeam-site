@@ -9,6 +9,9 @@ import type { Lang } from "./core/types.ts";
 import { CATALOG } from "./games/index.ts";
 import { Renderer, type View } from "./ui/render.ts";
 import { deviceClass, Telemetry } from "./telemetry/client.ts";
+import { SkillTracker } from "./skills/profile.ts";
+import { QuipPicker } from "./skills/quips.ts";
+import { hideSkills, renderSkills, type SkillsDom } from "./ui/skill-radar.ts";
 
 const lang: Lang = document.documentElement.lang.toLowerCase().startsWith("pt") ? "pt" : "en";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -74,6 +77,19 @@ window.addEventListener(
 
 const tele: Telemetry | null = TELEMETRY_URL ? new Telemetry({ endpoint: TELEMETRY_URL, version: GAME_VERSION }) : null;
 
+// ---------------- perfil de habilidades da partida ----------------
+// Só em memória: zera a cada partida, não é salvo nem enviado (a telemetria acima não o recebe).
+
+const skills = new SkillTracker();
+const quips = new QuipPicker();
+const skillsDom: SkillsDom = {
+  quip: $<HTMLElement>("mm-quip"),
+  box: $<HTMLElement>("mm-skills"),
+  chart: $<HTMLElement>("mm-radar"),
+  summary: $<HTMLElement>("mm-skill-sum"),
+  thin: $<HTMLElement>("mm-skill-thin"),
+};
+
 // ---------------- sessão ----------------
 
 const live = document.getElementById("mm-live");
@@ -90,6 +106,7 @@ const session = new Session({
   onEvent: (e) => {
     switch (e.type) {
       case "start":
+        skills.reset();
         if (TELEMETRY_URL) tele?.startRun({ lang, device: deviceClass() });
         audio.gameStart();
         break;
@@ -98,6 +115,7 @@ const session = new Session({
         if (live) live.textContent = `${tr(e.def.verb, lang)} — ${tr(e.def.name, lang)}`;
         break;
       case "result":
+        skills.record(e.def, e.result);
         if (TELEMETRY_URL && tele) {
           const r = session.runner;
           const n = session.played + 1;
@@ -166,6 +184,15 @@ function showOver(): void {
   $<HTMLElement>("mm-newbest").hidden = !newBest;
   const lost = session.lostTo;
   set("mm-lostto", lost ? tr(lost.name, lang) : "—");
+  // o perfil nunca pode atrapalhar o Game Over: qualquer falha só esconde o bloco
+  try {
+    const profile = skills.profile();
+    const quip = quips.pick({ profile, lostToWtf: lost?.wtf ?? "", lostToDifficulty: lost?.difficulty ?? 0, newBest });
+    renderSkills(skillsDom, profile, quip, lang);
+  } catch (err) {
+    console.error("[skills]", err);
+    hideSkills(skillsDom);
+  }
   show(overScr);
   againBtn.focus({ preventScroll: true });
 }
