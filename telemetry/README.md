@@ -16,7 +16,7 @@ Decisões aprovadas:
 
 ```
 Jogo (GitHub Pages, público, estático)
-   │  POST /v1/events  (lotes pequenos, text/plain, sendBeacon ao sair)
+   │  POST /v1/events  (2–4 lotes por partida, text/plain, sendBeacon ao sair)
    ▼
 mm-telemetry-ingest.<sub>.workers.dev      ← Worker PÚBLICO: só recebe eventos validados (nada de leitura)
    │  grava
@@ -75,12 +75,15 @@ e número, dificuldade e tipo WTF vêm desse catálogo.
 
 ## Esquema D1
 
-`runs` (uma linha por partida: início, último evento, versão, idioma, aparelho, estado, maior nível, placar,
-contagem e maior `seq`), `results` (um resultado por linha), `life_changes`, `seen_events` (ids já
-processados = idempotência). Detalhes em `migrations/0001_init.sql`.
+- **Uma linha por partida** (`runs`): início, último evento, versão, idioma, aparelho, estado, maior nível, placar,
+  contagem e maior `seq`, e a coluna `ev` com **todos os eventos da partida** em JSON compacto, por número de
+  sequência. Cada lote é mesclado com `json_patch`: **1 linha escrita por lote**, qualquer que seja o tamanho.
+- `mg_daily` + `rollup_days`: agregado diário por microgame × aparelho × versão, recalculado pelo cron
+  (idempotente: apaga o dia e refaz). O dashboard lê dali os dias fechados e só lê eventos crus de hoje.
+- Detalhes e formato dos eventos em `migrations/0001_init.sql`.
 
-- **Idempotência:** o mesmo evento duas vezes conta uma vez; a ordem de chegada não importa (máximos e o estado
-  mais final: Game Over > abandono > aberta).
+- **Idempotência:** o mesmo evento duas vezes grava a mesma chave com o mesmo valor; um lote sem nada novo não
+  escreve nada (0 linhas). A ordem de chegada não importa (máximos e o estado mais final: Game Over > abandono > aberta).
 - **Desfechos de uma partida** (uma partida sem Game Over **não** vira abandono confirmado automaticamente):
   - *Game Over* = evento `game_over`;
   - *abandono voluntário* = evento `game_abandon` com `quit`: a pessoa saiu pelo menu (escolha explícita de parar);
@@ -91,15 +94,17 @@ processados = idempotência). Detalhes em `migrations/0001_init.sql`.
     Fica separado do abandono confirmado e se divide em *presumido* (sequência completa) e *falha de envio*
     (lacuna em `seq` ou sem `game_start`);
   - *em andamento* = evento recente; fora das taxas.
-- **Contagem por ids:** o número de eventos de uma partida vem dos ids guardados, então lotes repetidos ou chegando
-  ao mesmo tempo não criam lacunas falsas nem dobram contagens.
-- **Retenção:** cron diário apaga as métricas com mais de `RETENTION_DAYS` dias (180; sempre entre 30 e 400).
+- **Contagem pelas chaves:** `events` soma só as chaves novas de cada lote, então lotes repetidos ou chegando ao
+  mesmo tempo não criam lacunas falsas nem dobram contagens.
+- **Cron diário (04:17 em Brasília):** agrega o dia que fechou (as partidas que viraram a meia-noite já acabaram)
+  e aplica a retenção: apaga partidas e agregados com mais de `RETENTION_DAYS` dias (180; sempre entre 30 e 400).
   O número precisa ser o mesmo em `ingest/wrangler.toml` e em `client.config.json` (`retention_days`, que vai
   para a política); um teste confere.
 
 ## Estratégia de envio
 
-- `game_start`, `game_over` e `game_abandon` saem na hora; os demais esperam até 4 s ou 10 eventos.
+- `game_over` e `game_abandon` saem na hora; os demais (inclusive o `game_start`) esperam até 30 s ou 20 eventos.
+  Uma partida típica sai em 2–4 lotes (cada lote = 1 requisição e 1 linha escrita no D1). Um lote = uma partida.
 - Aba ficando oculta: envia a fila com `sendBeacon`. Fechar a página no meio da partida: `game_abandon` por `sendBeacon`.
 - Nunca aguarda a rede: `fetch` com `keepalive`, sem `await` no laço do jogo, tudo em `try/catch`.
 - Offline: descarta. Depois de 3 falhas seguidas, desiste naquela aba. Fila só em memória, com limite de 100.
@@ -110,8 +115,8 @@ processados = idempotência). Detalhes em `migrations/0001_init.sql`.
 
 ## Métricas do dashboard
 
-Toda métrica mostra o tamanho da amostra. Filtros: período (início da partida, UTC), aparelho, dificuldade
-(estatísticas por microgame) e versão.
+Toda métrica mostra o tamanho da amostra. Filtros: período (dias inteiros pelo início da partida, horário de
+Brasília; abre nos últimos 7 dias), aparelho, dificuldade (estatísticas por microgame) e versão.
 
 - Tudo conta **partidas** (sessões), nunca pessoas: não há identificador de jogador, logo não há "jogadores únicos".
 - Partidas iniciadas; Game Over; abandono voluntário; saída detectada; sem fim registrado (presumido / falha de envio), em número e %.
@@ -150,8 +155,9 @@ Os testes em `tests/site.test.ts` geram as páginas nos dois estados (sem gravar
 ## Segurança — resumo
 
 - Ingestão: só `POST /v1/events`; CORS só para `https://maedodeam.com.br` (não é autenticação); corpo ≤ 32 KB;
-  ≤ 30 eventos; validação estrita; limite por IP (60 a cada 10 s, limitador da Cloudflare + contador em memória; o IP não vai para o banco);
-  limite de eventos por partida; respostas sem dados (204 ou código genérico).
+  ≤ 30 eventos de uma única partida (≤ 2 linhas escritas por requisição); validação estrita; limite de eventos
+  por partida; respostas sem dados (204 ou código genérico). Limites de requisição: ver "Limite de requisições"
+  (o IP só é usado no limitador, nunca vai para o banco).
 - Eventos podem ser falsificados por quem quiser: os números são estatísticas de comportamento, não contabilidade.
   As defesas acima limitam o estrago (lixo validado e com teto), e o ranking exige amostra mínima.
 - Dashboard: Access (só seu e-mail) + verificação do token no Worker (falha fechada) + `no-store`, `noindex`,
@@ -173,32 +179,81 @@ Os testes em `tests/site.test.ts` geram as páginas nos dois estados (sem gravar
 - **Direitos do titular:** como não há identificação, não há como localizar os dados de uma pessoa; dizer isso na
   política e manter o contato para dúvidas.
 
-## Ativação (só com a sua autorização)
+## Limite de requisições
 
-O que você precisa autorizar e fazer na Cloudflare, nesta ordem (o `scripts/deploy.ps1` guia cada passo):
+Três camadas, todas precisam aprovar (`ingest/src/index.ts`):
 
-1. **Conta Cloudflare** (gratuita) e `npx wrangler login` — o login é feito por você no navegador.
-2. **Subdomínio `workers.dev`** da conta (escolhido uma vez; aparece nos endereços dos dois Workers).
-3. **D1:** criar o banco `mm-telemetry` e aplicar `migrations/` (`wrangler d1 create` + `d1 migrations apply --remote`).
-   Copiar o `database_id` para os dois `wrangler.toml`.
-4. **Worker de ingestão:** `wrangler deploy` em `telemetry/ingest`. Ativa: o endpoint público, o cron diário de
-   retenção e o limitador de requisições.
-5. **Zero Trust / Cloudflare Access** (plano gratuito; a Cloudflare pode pedir um meio de pagamento para ativar o
-   Zero Trust, mesmo sem cobrar): criar o time (`<time>.cloudflareaccess.com`), o login por código no e-mail
-   (One-time PIN) e uma política *Allow* só para o seu e-mail.
-6. **Worker do dashboard:** definir `ACCESS_TEAM_DOMAIN` no `wrangler.toml`, `wrangler secret put ALLOWED_EMAILS`
-   (o seu e-mail — fica só na Cloudflare) e `wrangler deploy` em `telemetry/dashboard`. Mesmo antes do Access, o
-   Worker nega tudo (falha fechada).
-7. **Ligar o Access no `workers.dev` do dashboard** (Workers → mm-telemetry-dashboard → Settings → Domains & Routes →
-   workers.dev → Cloudflare Access) e copiar o **AUD** da aplicação criada para `ACCESS_AUD`; publicar de novo.
-   Conferir que **Preview URLs** está desligado nos dois Workers.
-8. **Verificar:** sem login, o dashboard pede o código do Access e a API responde 403; a ingestão responde 404 em
-   qualquer caminho de leitura.
-9. **Ligar no jogo** (só com a autorização final): em `client.config.json`, `"endpoint"` =
-   `https://mm-telemetry-ingest.<sub>.workers.dev`, `"policy_date"` = a data da publicação (AAAA-MM-DD) e
-   `"retention_days"` = o mesmo valor de `RETENTION_DAYS`; `npm run build`; `npm test` e `npm run e2e`; merge na
-   `main` e push (o GitHub Actions publica). Isso liga, juntos: coleta, CSP do jogo (só esse endereço), aviso e
-   botão na tela inicial, textos do site e a seção da política.
+| camada | o quê | número |
+| --- | --- | --- |
+| binding nativo por cliente (`RATE_LIMITER`) | chave = IPv4, ou o prefixo /64 do IPv6 (trocar de endereço dentro da mesma rede não escapa) | 100 a cada 10 s, por local da Cloudflare |
+| binding nativo global (`GLOBAL_LIMITER`) | uma chave para todos: teto contra abuso vindo de muitos IPs | 300 a cada 10 s, por local |
+| contador em memória | por instância do Worker; pega rajadas de um cliente que caem na mesma instância | 100 a cada 10 s |
+
+- **Limitações (documentadas pela Cloudflare e medidas aqui):** os bindings são aproximados, contados por local e
+  com consistência eventual. Funcionam com várias instâncias, mas deixam passar 2–4× o número sob rajada (medido:
+  um cliente com 8 conexões teve ~200–400 aceitas a cada 10 s). Não existe limite global exato sem um Durable
+  Object (1 requisição extra por lote, mais latência, mesma cota diária) ou regras de rate limiting do WAF (exigem
+  domínio próprio na Cloudflare, isto é, mudar o DNS de maedodeam.com.br — fora de escopo).
+- **CGNAT:** uma partida manda ~4 lotes em ~90 s (~0,5 por 10 s). 100 a cada 10 s comportam ~200 pessoas jogando ao
+  mesmo tempo atrás do mesmo IP. A maioria dos celulares no Brasil já usa IPv6 (com /64 próprio).
+- **Pior caso de abuso:** cada requisição escreve no máximo 2 linhas, então um atacante consegue ~30 escritas/s por
+  local. No plano gratuito isso **não gera custo**: a cota diária acaba, a coleta para até 00:00 UTC e o jogo segue
+  normal. No plano pago, o mesmo ataque custaria ~US$ 3/dia (escritas + requisições) — por isso a recomendação é
+  ficar no gratuito enquanto couber e criar alertas de cobrança antes de mudar de plano.
+
+## Consumo e custo (medido no D1 real)
+
+| | antes | agora |
+| --- | --- | --- |
+| linhas escritas por partida típica (15 microgames, 22 eventos) | ~170 + ~170 na retenção | **5** (2 + 1 + 1 + 1) **+ 1** na retenção |
+| lote reenviado (retry) | ~10 | **0** |
+| linhas lidas por partida na ingestão | ~70 | ~44 |
+| requisições por partida | ~17 | ~4 |
+| tamanho por partida | ~5 KB em 4 tabelas | ~0,8 KB |
+
+**Capacidade no plano gratuito** (vale o que acabar primeiro):
+
+| recurso grátis por dia | por partida | partidas/dia |
+| --- | --- | --- |
+| D1: 100 mil linhas escritas | ~6 (+ agregação diária, ≤ ~1 mil linhas/dia no total) | **~16 mil** |
+| Workers: 100 mil requisições | ~4 | ~25 mil |
+| D1: 5 milhões de linhas lidas | ~44 na ingestão + ~45 na agregação | ~55 mil (sobra para o dashboard) |
+| D1: 5 GB | ~0,8 KB × 180 dias | ~35 mil/dia em regime |
+
+Antes: ~700–900 partidas/dia. Agora: **~16 mil partidas/dia sem custo** (~20× mais).
+
+**Leituras do dashboard:** dias fechados vêm do agregado (poucas linhas); hoje vem dos eventos crus (~2 leituras
+por evento); as partidas do período, ~5 leituras cada. No limite de 16 mil partidas/dia, cada carga lê ~1–1,5
+milhão de linhas (~3 cargas/dia no gratuito); com 2 mil partidas/dia, ~0,2 milhão por carga.
+
+**Se passar do gratuito — Workers Paid, US$ 5/mês** (preços de nov/2026):
+- incluídos por mês: 10 milhões de requisições, 50 milhões de linhas escritas, 25 bilhões de linhas lidas, 5 GB;
+- 50 mil partidas/dia ≈ 6 M requisições + 9 M escritas por mês: **cabe nos US$ 5**;
+- 200 mil partidas/dia ≈ 24 M requisições (+US$ 4,20) e 36 M escritas (incluídas): **≈ US$ 9–10/mês**;
+- excedentes: US$ 0,30 por milhão de requisições, US$ 1,00 por milhão de linhas escritas, US$ 0,75 por GB-mês.
+
+## Ambientes publicados
+
+| | teste (staging) | produção |
+| --- | --- | --- |
+| ingestão | `https://mm-telemetry-ingest-staging.maedodeam.workers.dev` (aceita só `http://127.0.0.1:8765` e `http://localhost:8765`) | `https://mm-telemetry-ingest.maedodeam.workers.dev` (aceita só `https://maedodeam.com.br`) |
+| dashboard | `https://mm-telemetry-dashboard-staging.maedodeam.workers.dev` | `https://mm-telemetry-dashboard.maedodeam.workers.dev` |
+| D1 | `mm-telemetry-staging` | `mm-telemetry` |
+| Access | política "Cloudflare account" (membros da conta) + `ALLOWED_EMAILS` | política `somente-dono-telemetria` (só o seu e-mail) + `ALLOWED_EMAILS` |
+| login | `databairro.cloudflareaccess.com` (time Zero Trust já existente na conta) | idem |
+
+Os Workers estão publicados, mas **o jogo não envia nada**: `client.config.json` continua com `endpoint` vazio.
+
+## Ativação (só com a sua autorização final)
+
+1. Em `client.config.json`: `"endpoint": "https://mm-telemetry-ingest.maedodeam.workers.dev"`,
+   `"policy_date"` = a data da publicação (AAAA-MM-DD), `"retention_days": 180`.
+2. `npm run build` (PowerShell, com `SITE_CONTACT_EMAIL` carregado), `npm test`, `npm run e2e`,
+   `python src/build.py --check`.
+3. Conferir no diff: CSP do jogo só com esse endereço, aviso + botão na tela inicial, seção da política PT/EN.
+4. Merge de `feat/telemetry` na `main` e push (o GitHub Actions publica).
+5. Depois do deploy: jogar uma partida em `https://maedodeam.com.br/play/` e conferir no dashboard de produção.
+6. Acompanhar o uso em Workers & Pages → Usage e D1 → Metrics nos primeiros dias.
 
 ### Checklist de pré-ativação (cada item tem teste automático)
 
@@ -207,7 +262,8 @@ O que você precisa autorizar e fazer na Cloudflare, nesta ordem (o `scripts/dep
 | partida sem Game Over não vira abandono confirmado | `stats.test.ts` → "partida sem Game Over e sem evento de saída NUNCA conta como abandono" |
 | saída detectada ≠ abandono voluntário | `stats.test.ts` → "saída detectada (fechou a página) separada do abandono voluntário (saiu pelo menu)" |
 | dashboard e todos os endpoints exigem autenticação válida | `dashboard.test.ts` → "sem token: 403 em todas as rotas…", "endereços alternativos e outros métodos…", "tokens adulterados…", "falha fechada" |
-| processamento idempotente | `ingest.test.ts` → "o mesmo lote enviado duas vezes…", "dois lotes iguais chegando ao mesmo tempo…", "ordem de chegada não importa…" |
+| processamento idempotente | `ingest.test.ts` → "o mesmo lote enviado duas vezes…", "dois lotes iguais chegando ao mesmo tempo…", "ordem de chegada não importa…", "reenvio idêntico não escreve nada"; `stats.test.ts` → agregação diária "dá exatamente o mesmo resultado" e "não duplica" |
+| custo previsível sob abuso | `ingest.test.ts` → "lote máximo (30 eventos): 1 comando, 1 linha escrita", "um lote só pode ter uma partida", "IPv6 conta pelo prefixo /64", "teto global nativo" |
 | jogo funciona com a telemetria fora do ar | `telemetry-client.test.ts` → "serviço fora do ar…"; validado também à mão com o servidor local derrubado (partida inteira até o Game Over) |
 | partidas não confundidas com jogadores | `dashboard.test.ts` → "dashboard: partidas não são jogadores"; `stats.test.ts` (`sample.unit`) |
 | mensagens de privacidade coerentes | `site.test.ts` (todas) e `privacy.test.ts` |

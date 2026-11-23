@@ -1,5 +1,4 @@
 # Worker PRIVADO do dashboard — atrás do Cloudflare Access (só o seu e-mail) e verificando o token do Access no código.
-# Ainda NÃO publicado. Ver telemetry/README.md ("Ativação") antes de qualquer deploy.
 name = "mm-telemetry-dashboard"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
@@ -15,14 +14,14 @@ enabled = false
 [[d1_databases]]
 binding = "DB"
 database_name = "mm-telemetry"
-database_id = "COLE_AQUI_O_ID_DO_D1"
+database_id = "b4186c83-39a2-4649-8cab-7280560600c4"
 migrations_dir = "../migrations"
 
 [vars]
 # Domínio do time no Zero Trust (Settings → Custom Pages → Team domain), ex.: "maedodeam.cloudflareaccess.com"
-ACCESS_TEAM_DOMAIN = "COLE_AQUI.cloudflareaccess.com"
+ACCESS_TEAM_DOMAIN = "databairro.cloudflareaccess.com"   # time do Zero Trust já existente na conta
 # Application Audience (AUD) Tag da aplicação do Access que protege este Worker
-ACCESS_AUD = "COLE_AQUI_O_AUD"
+ACCESS_AUD = "d238e03be1eca55e65fe5a532fbd23c911d99bf7692dc869d61d9f628cda6100"   # política somente-dono-telemetria
 ABANDON_AFTER_MIN = "30"
 RANKING_MIN_ATTEMPTS = "30"
 # ALLOWED_EMAILS NÃO fica aqui (o repositório é público): npx wrangler secret put ALLOWED_EMAILS

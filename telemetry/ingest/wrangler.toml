@@ -15,7 +15,7 @@ enabled = false
 [[d1_databases]]
 binding = "DB"
 database_name = "mm-telemetry"
-database_id = "COLE_AQUI_O_ID_DO_D1"   # saída de: npx wrangler d1 create mm-telemetry
+database_id = "b4186c83-39a2-4649-8cab-7280560600c4"   # saída de: npx wrangler d1 create mm-telemetry
 migrations_dir = "../migrations"
 
 [vars]
