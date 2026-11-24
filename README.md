@@ -72,7 +72,7 @@ As capturas são do próprio jogo (`TestResults/idiomas` no repositório `stealt
 Open Graph e os ícones. Depois, `python src/build.py`.
 
 As telas do DataBairro (P—02) são capturas reais da produção (`app.databairro.com.br`), recortadas sem endereço,
-unidade, mapa nem nomes do entorno, e ficam em `tools/capturas/databairro/` (736 × 470; essa pasta não é publicada).
+unidade, mapa nem nomes do entorno, e ficam em `tools/capturas/databairro/` (1472 × 940, o layout de 752 px do app desenhado em 2x; essa pasta não é publicada).
 O app só existe em português: a mesma imagem serve aos dois idiomas. Para trocar, substitua os PNG mantendo o tamanho
 e rode `python tools/assets.py databairro` (gera só essas, sem mexer nas do jogo) e depois `python src/build.py`.
 

@@ -29,7 +29,7 @@ LANGS = {
     "pt-BR": {"dir": "pt-br/", "slug": "pt-br", "og_locale": "pt_BR", "privacy": "pt-BR"},
 }
 WIDTHS = (640, 960, 1440, 1920)
-APP_WIDTHS = (480, 736)  # telas do DataBairro (tools/assets.py), 736 × 470, iguais nos dois idiomas
+APP_WIDTHS = (480, 736, 1104, 1472)  # telas do DataBairro (tools/assets.py), 1472 × 940, iguais nos dois idiomas
 DATABAIRRO_URL = "https://app.databairro.com.br/"
 ARROW = '<span class="arw" aria-hidden="true"></span>'
 
@@ -77,7 +77,7 @@ def app_picture(root, name, alt, sizes):
     avif = ", ".join(f"{base}-{w}.avif {w}w" for w in APP_WIDTHS)
     webp = ", ".join(f"{base}-{w}.webp {w}w" for w in APP_WIDTHS)
     return (f'<picture><source type="image/avif" srcset="{avif}" sizes="{sizes}">'
-            f'<img src="{base}-736.webp" srcset="{webp}" sizes="{sizes}" width="736" height="470" '
+            f'<img src="{base}-736.webp" srcset="{webp}" sizes="{sizes}" width="1472" height="940" '
             f'alt="{html.escape(alt, quote=True)}" loading="lazy" decoding="async"></picture>')
 
 

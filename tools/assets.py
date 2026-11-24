@@ -35,9 +35,10 @@ LANGS = {"en": "en", "pt-br": "pt-BR"}  # sufixo no site -> idioma da captura
 
 # DataBairro: telas reais da produção (app.databairro.com.br, consulta de 2026-11-24), recortadas sem endereço,
 # unidade, mapa nem nomes do entorno. O app só existe em português: a mesma imagem serve aos dois idiomas.
+# Fonte em 1472 × 940: o layout de 752 px do app desenhado em 2x (como numa tela retina), em 4 partes emendadas.
 APP_CAPTURES = ROOT / "tools" / "capturas" / "databairro"
 APP_SHOTS = ("consulta", "resultado", "comparaveis")
-APP_WIDTHS = (480, 736)
+APP_WIDTHS = (480, 736, 1104, 1472)
 
 BG = (13, 13, 11)
 TEXT = (239, 236, 228)
