@@ -31,8 +31,8 @@
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/archivo-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/site.css?v=13e8bdb9">
-<script src="assets/site.js?v=13e8bdb9" defer></script>
+<link rel="stylesheet" href="assets/site.css?v=ed923847">
+<script src="assets/site.js?v=ed923847" defer></script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://maedodeam.com.br/#org", "name": "MAEDODEAM", "legalName": "MAEDODEAM CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA", "url": "https://maedodeam.com.br/", "logo": "https://maedodeam.com.br/apple-touch-icon.png", "email": "maedodeam@gmail.com", "description": "Independent technology company building software, products, games and experiments.", "founder": {"@type": "Person", "name": "Roger Maedo", "jobTitle": "Founder"}}, {"@type": "WebSite", "@id": "https://maedodeam.com.br/#website", "url": "https://maedodeam.com.br/", "name": "MAEDODEAM", "inLanguage": "en", "publisher": {"@id": "https://maedodeam.com.br/#org"}}]}</script>
 </head>
 <body>
@@ -184,46 +184,77 @@
           </div>
         </article>
 
-        <article class="project project--saas" id="cotaria" aria-labelledby="p2-title">
+        <article class="project project--saas" id="databairro" aria-labelledby="p2-title">
           <header class="project-head">
-            <p class="label"><span class="project-num">P—02</span> · SaaS · Business platform · MVP</p>
-            <h3 class="project-name" id="p2-title" data-reveal>Cotaria</h3>
+            <p class="label"><span class="project-num">P—02</span> · Real estate intelligence · Live, invite-only</p>
+            <h3 class="project-name" id="p2-title" data-reveal>DataBairro</h3>
             <ul class="tags" aria-label="Tags">
-              <li>SaaS</li><li>Business systems</li><li>Backend</li><li>Frontend</li><li>Cloud</li><li>Product development</li>
+              <li>Data engineering</li><li>ETL pipelines</li><li>PostGIS</li><li>Geospatial analysis</li><li>Statistical models</li><li>End-to-end</li>
             </ul>
           </header>
 
+          <!-- Telas reais da produção (consulta e resultado), sem endereço, unidade nem mapa -->
+          <div class="gallery gallery--app">
+            <figure class="shot" data-reveal>
+              <picture><source type="image/avif" srcset="assets/img/databairro-consulta-480.avif 480w, assets/img/databairro-consulta-736.avif 736w" sizes="(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw"><img src="assets/img/databairro-consulta-736.webp" srcset="assets/img/databairro-consulta-480.webp 480w, assets/img/databairro-consulta-736.webp 736w" sizes="(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw" width="736" height="470" alt="DataBairro search screen, in Portuguese: an address field, optional unit and tower fields, and the Analyze button." loading="lazy" decoding="async"></picture>
+              <figcaption><span class="mono">Fig. 04</span><span>The query: an address in São Paulo and, optionally, the unit. The app is in Portuguese.</span></figcaption>
+            </figure>
+            <figure class="shot" data-reveal style="--d: 1">
+              <picture><source type="image/avif" srcset="assets/img/databairro-resultado-480.avif 480w, assets/img/databairro-resultado-736.avif 736w" sizes="(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw"><img src="assets/img/databairro-resultado-736.webp" srcset="assets/img/databairro-resultado-480.webp 480w, assets/img/databairro-resultado-736.webp 736w" sizes="(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw" width="736" height="470" alt="DataBairro result: a high-confidence value reference of R$ 344,000 to R$ 548,000, central value R$ 435,000, based on 8 comparables from the same building sold between September 2025 and July 2026." loading="lazy" decoding="async"></picture>
+              <figcaption><span class="mono">Fig. 05</span><span>The result: a range, a central value and the confidence behind it.</span></figcaption>
+            </figure>
+            <figure class="shot" data-reveal style="--d: 2">
+              <picture><source type="image/avif" srcset="assets/img/databairro-comparaveis-480.avif 480w, assets/img/databairro-comparaveis-736.avif 736w" sizes="(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw"><img src="assets/img/databairro-comparaveis-736.webp" srcset="assets/img/databairro-comparaveis-480.webp 480w, assets/img/databairro-comparaveis-736.webp 736w" sizes="(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw" width="736" height="470" alt="Four of the eight comparable sales DataBairro selected, each with its declared value, month, registered area and price per square meter." loading="lazy" decoding="async"></picture>
+              <figcaption><span class="mono">Fig. 06</span><span>The evidence: the comparable sales the estimate came from.</span></figcaption>
+            </figure>
+          </div>
+
           <div class="project-body">
             <div class="project-copy" data-reveal>
-              <p class="pitch">Hairy financial rules, turned into software that does the math.</p>
-              <p>Cotaria is a platform for running consórcio groups — Brazil's pooled-credit model, where members pay into a shared fund and receive credit over time.</p>
-              <p>It brings operations, administration and the member experience into a single product, built to replace spreadsheets and manual work with software where every number can be traced.</p>
+              <p class="pitch">Real estate decisions backed by real data.</p>
+              <p>DataBairro is a real estate intelligence platform that estimates apartment market values in São Paulo using actual property transaction data rather than asking prices.</p>
+              <p>Built from the ground up, it transforms over 1.3 million property transaction records into actionable insights through geospatial analysis, automated data pipelines and statistical valuation models.</p>
+              <ul class="points">
+                <li><strong>Data engineering.</strong> ETL pipelines download the city's public records, validate them, link each transaction to the property register and screen out sales that don't reflect the market.</li>
+                <li><strong>1.3 million+ records.</strong> 1,333,581 ITBI transaction records from 2019 to 2026, alongside the municipal property register.</li>
+                <li><strong>Geospatial analysis.</strong> PostgreSQL and PostGIS place each address on the city's lot map and measure what's around it: transit, schools, health care and flood risk.</li>
+                <li><strong>Comparable-based valuation.</strong> Up to eight comparable sales — same building first, then nearby — and the median price per square meter, applied to the unit's registered area.</li>
+                <li><strong>Confidence indicators.</strong> Every estimate comes as a range with a confidence level. When the evidence is thin, DataBairro says so instead of guessing.</li>
+                <li><strong>End-to-end development.</strong> From data pipelines and database to API, web app and production infrastructure.</li>
+              </ul>
+              <p class="project-cta">
+                <a class="btn arrow" href="https://app.databairro.com.br/" rel="noopener" aria-describedby="databairro-access">Open DataBairro</a>
+                <span class="soon" id="databairro-access"><span class="led led--pulse" aria-hidden="true"></span>Invite-only access</span>
+              </p>
+              <p class="fine">Estimates are statistical references based on declared transactions, not formal appraisals.</p>
             </div>
 
             <figure class="sysmap" data-reveal style="--d: 1">
               <div class="sysmap-frame">
-                <p class="sysmap-bar mono"><span>cotaria / architecture</span><span>MVP</span></p>
+                <p class="sysmap-bar mono"><span>databairro / architecture</span><span>PROD</span></p>
                 <ul class="sysmap-apps">
-                  <li>Back office</li><li>Admin</li><li>Member portal</li>
+                  <li>ITBI · transactions</li><li>IPTU · property register</li><li>GeoSampa · lots & maps</li>
                 </ul>
-                <p class="sysmap-api"><span class="mono">web</span><span>React · TypeScript</span></p>
+                <p class="sysmap-api"><span class="mono">etl</span><span>Python · pandas · psycopg</span></p>
+                <p class="sysmap-api"><span class="mono">data</span><span>PostgreSQL 17 · PostGIS 3.5</span></p>
                 <p class="sysmap-api"><span class="mono">api</span><span>NestJS · Prisma</span></p>
                 <ul class="sysmap-svc">
-                  <li style="--i: 0">Accounts & roles</li>
-                  <li style="--i: 1">Scheduled jobs</li>
-                  <li style="--i: 2">Audit trail</li>
-                  <li style="--i: 3">Reports</li>
+                  <li style="--i: 0">Cadastral geocoding</li>
+                  <li style="--i: 1">Comparables</li>
+                  <li style="--i: 2">Range & confidence</li>
+                  <li style="--i: 3">Local indicators</li>
                 </ul>
-                <p class="sysmap-api"><span class="mono">data</span><span>PostgreSQL · Redis</span></p>
+                <p class="sysmap-api"><span class="mono">web</span><span>Next.js · React · MapLibre</span></p>
               </div>
-              <figcaption><span class="mono">Fig. 04</span><span>Architecture at a glance. Screens when it ships.</span></figcaption>
+              <figcaption><span class="mono">Fig. 07</span><span>Architecture as built: from public records to an answer.</span></figcaption>
             </figure>
 
             <dl class="spec" data-reveal style="--d: 2">
-              <div><dt>Type</dt><dd>B2B SaaS</dd></div>
-              <div><dt>Apps</dt><dd>Back office, admin console, member portal</dd></div>
-              <div><dt>Stack</dt><dd>TypeScript · NestJS · Prisma · PostgreSQL · Redis · React · Docker</dd></div>
-              <div class="status"><dt>Status</dt><dd><span class="led led--pulse" aria-hidden="true"></span>MVP in build</dd></div>
+              <div><dt>Type</dt><dd>Real estate intelligence platform</dd></div>
+              <div><dt>Coverage</dt><dd>City of São Paulo — value references for apartments</dd></div>
+              <div><dt>Data</dt><dd>1.3M+ ITBI transaction records · 2019–2026</dd></div>
+              <div><dt>Stack</dt><dd>Python · PostgreSQL · PostGIS · NestJS · Next.js · Docker</dd></div>
+              <div class="status"><dt>Status</dt><dd><span class="led led--pulse" aria-hidden="true"></span>In production · invite-only</dd></div>
             </dl>
           </div>
         </article>
@@ -254,7 +285,7 @@
       </header>
 
       <div class="board" data-reveal>
-        <p class="board-bar mono"><span><span class="led led--pulse" aria-hidden="true"></span>maedodeam / lab</span><span>Updated October 2026</span></p>
+        <p class="board-bar mono"><span><span class="led led--pulse" aria-hidden="true"></span>maedodeam / lab</span><span>Updated November 2026</span></p>
         <div class="board-cols mono" aria-hidden="true">
           <span>Project</span><span>Type</span><span>Stage</span><span>Next</span>
         </div>
@@ -268,10 +299,10 @@
           </li>
           <li class="board-row">
             <span class="led led--pulse" aria-hidden="true"></span>
-            <h3 class="board-name">Cotaria</h3>
-            <p class="board-type">SaaS / business platform</p>
-            <p class="stages"><span class="vh">Current stage: Build</span><span class="done" aria-hidden="true">Idea</span><span class="now" aria-hidden="true">Build</span><span aria-hidden="true">Test</span><span aria-hidden="true">Ship</span></p>
-            <p class="board-next"><span class="vh">Next step:</span>Finishing the MVP.</p>
+            <h3 class="board-name">DataBairro</h3>
+            <p class="board-type">Real estate intelligence platform</p>
+            <p class="stages"><span class="vh">Current stage: Ship</span><span class="done" aria-hidden="true">Idea</span><span class="done" aria-hidden="true">Build</span><span class="done" aria-hidden="true">Test</span><span class="now" aria-hidden="true">Ship</span></p>
+            <p class="board-next"><span class="vh">Next step:</span>Commercial validation and customer acquisition.</p>
           </li>
           <li class="board-row board-row--next">
             <span class="led led--off" aria-hidden="true"></span>
@@ -390,7 +421,7 @@
         <span class="label" id="f-products">Products</span>
         <ul>
           <li><a href="#escritorio-17h58">Escritório 17h58</a></li>
-          <li><a href="#cotaria">Cotaria</a></li>
+          <li><a href="#databairro">DataBairro</a></li>
           <li><a href="play/">Microgame Mayhem</a></li>
         </ul>
       </nav>

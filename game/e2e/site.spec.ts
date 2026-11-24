@@ -24,6 +24,59 @@ for (const [path, lang, play] of [
   });
 }
 
+// P—02 é o DataBairro (no lugar do Cotaria): telas reais, link da produção com o aviso de convite, quadro em "Ship".
+for (const [path, lang, ship, updated, invite, disclaimer] of [
+  ["/", "en", "Ship", "Updated November 2026", "Invite-only access", "not formal appraisals"],
+  ["/pt-br/", "pt-BR", "Lançar", "Atualizado em novembro de 2026", "Acesso por convite", "não laudos de avaliação"],
+] as const) {
+  test(`home ${lang}: DataBairro em P—02, com telas, link da produção e quadro em ${ship}`, async ({ page }) => {
+    await page.goto(path);
+    const p2 = page.locator("article#databairro");
+    await expect(p2.locator(".project-num")).toHaveText("P—02");
+    await expect(p2.locator("h3.project-name")).toHaveText("DataBairro");
+
+    // três telas reais, carregadas, cada uma com texto alternativo e legenda
+    const imgs = p2.locator(".gallery--app img");
+    await expect(imgs).toHaveCount(3);
+    for (let i = 0; i < 3; i++) {
+      const img = imgs.nth(i);
+      await img.scrollIntoViewIfNeeded();
+      await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+      expect((await img.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(40);
+    }
+    await expect(p2.locator(".gallery--app figcaption")).toHaveCount(3);
+
+    // link direto para a produção, com o aviso de acesso por convite ligado a ele
+    const cta = p2.locator(".project-cta a");
+    await expect(cta).toHaveAttribute("href", "https://app.databairro.com.br/");
+    await expect(cta).toHaveAttribute("rel", /noopener/);
+    const note = page.locator(`#${await cta.getAttribute("aria-describedby")}`);
+    await expect(note).toHaveText(invite);
+    await expect(p2.locator(".fine")).toContainText(disclaimer);
+
+    // arquitetura fiel (fontes → ETL → PostGIS → API → web) e ficha técnica
+    await expect(p2.locator(".sysmap-frame")).toContainText("PostGIS 3.5");
+    await expect(p2.locator(".spec")).toContainText(/1[.,]3/);
+
+    // quadro "Currently building": DataBairro na última etapa, data de novembro de 2026
+    const row = page.locator(".board-row", { has: page.locator(".board-name", { hasText: "DataBairro" }) });
+    await expect(row.locator(".stages .now")).toHaveText(ship);
+    await expect(row.locator(".stages .done")).toHaveCount(3);
+    await expect(page.locator(".board-bar")).toContainText(updated);
+
+    // rodapé aponta para a âncora que existe
+    await expect(page.locator('.site-footer a[href$="#databairro"]')).toHaveCount(1);
+  });
+}
+
+test("nenhuma página tem referência ao Cotaria; o rodapé leva ao DataBairro", async ({ page }) => {
+  for (const path of ["/", "/pt-br/", "/support.html", "/pt-br/support.html", "/privacy.html", "/404.html"]) {
+    await page.goto(path);
+    expect((await page.content()).toLowerCase(), path).not.toContain("cotaria");
+    await expect(page.locator('.site-footer a[href$="#databairro"]'), path).toHaveCount(1);
+  }
+});
+
 test("o atalho perto do título abre o jogo", async ({ page }) => {
   await page.goto("/pt-br/");
   await page.locator(".hero-play-btn").click();

@@ -653,7 +653,7 @@ ul, ol { padding: 0; list-style: none; }
 .project-links { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: 1.75rem; font-size: .9375rem; }
 .project-links a { color: var(--muted); }
 .project-links a:hover { color: var(--text); }
-.project-links .soon { color: var(--faint); font-family: var(--mono); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; display: inline-flex; align-items: center; gap: .5rem; }
+.project-links .soon, .project-cta .soon { color: var(--faint); font-family: var(--mono); font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; display: inline-flex; align-items: center; gap: .5rem; }
 
 .spec {
   border-top: 1px solid var(--line-2);
@@ -676,8 +676,26 @@ ul, ol { padding: 0; list-style: none; }
   .spec { grid-column: 8 / -1; align-self: start; }
 }
 
-/* Cotaria: mapa do sistema */
-.project--saas .project-body { margin-top: 0; }
+/* DataBairro: telas reais do app (iguais nos dois idiomas), diferenciais, link e aviso */
+.gallery--app { grid-template-columns: 1fr; }
+.gallery--app .shot picture { aspect-ratio: 736 / 470; background: #fbfbfb; }
+@media (min-width: 48rem) {
+  .gallery--app { grid-template-columns: 1fr; grid-template-rows: auto; }
+  .gallery--app figure:first-child { grid-column: auto; grid-row: auto; display: block; }
+  .gallery--app figure:first-child picture { aspect-ratio: 736 / 470; }
+}
+@media (min-width: 60rem) {
+  .gallery--app { grid-template-columns: repeat(3, 1fr); }
+}
+.points { display: grid; gap: .85rem; max-width: 36rem; margin-top: 1.75rem; }
+.points li { position: relative; padding-left: 1.5rem; color: var(--muted); line-height: 1.5; }
+.points li::before { content: ""; position: absolute; left: 0; top: .75em; width: .7rem; height: 1px; background: var(--accent); }
+.points strong { color: var(--text); font-weight: 600; }
+.project-cta { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
+.project-copy .project-cta { margin-top: 2rem; }
+.project-copy p.fine { font-size: .8125rem; color: var(--faint); margin-top: 1rem; }
+
+/* DataBairro: mapa da arquitetura */
 .sysmap { min-width: 0; }
 .sysmap-frame {
   border: 1px solid var(--line-2);
@@ -726,6 +744,7 @@ ul, ol { padding: 0; list-style: none; }
   25%, 100% { border-color: var(--line-2); color: var(--muted); }
 }
 @media (min-width: 60rem) {
+  .project--saas .project-body { grid-template-rows: auto 1fr; }
   .project--saas .project-copy { grid-column: 1 / 6; grid-row: 1 / 3; align-self: start; position: sticky; top: 6rem; }
   .project--saas .sysmap { grid-column: 7 / -1; grid-row: 1; }
   .project--saas .spec { grid-column: 7 / -1; grid-row: 2; margin-top: 1rem; }

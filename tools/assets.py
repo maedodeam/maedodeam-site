@@ -4,10 +4,12 @@
 Rodar só quando uma imagem mudar (o resultado vai para o repositório):
 
     python tools/assets.py
+    python tools/assets.py databairro     (só as telas do DataBairro)
 
 Precisa de Pillow (com AVIF) e fontTools + brotli:  pip install pillow fonttools brotli
-As capturas vêm do repositório do jogo (TestResults/idiomas, geradas pelo próprio jogo);
-o caminho pode ser trocado com a variável de ambiente GAME_CAPTURES.
+As capturas do jogo vêm do repositório dele (TestResults/idiomas, geradas pelo próprio jogo);
+o caminho pode ser trocado com a variável de ambiente GAME_CAPTURES. As do DataBairro ficam em
+tools/capturas/databairro (telas reais, já recortadas; essa pasta não é publicada).
 """
 import io
 import os
@@ -31,6 +33,12 @@ SHOTS = {
 }
 LANGS = {"en": "en", "pt-br": "pt-BR"}  # sufixo no site -> idioma da captura
 
+# DataBairro: telas reais da produção (app.databairro.com.br, consulta de 2026-11-24), recortadas sem endereço,
+# unidade, mapa nem nomes do entorno. O app só existe em português: a mesma imagem serve aos dois idiomas.
+APP_CAPTURES = ROOT / "tools" / "capturas" / "databairro"
+APP_SHOTS = ("consulta", "resultado", "comparaveis")
+APP_WIDTHS = (480, 736)
+
 BG = (13, 13, 11)
 TEXT = (239, 236, 228)
 MUTED = (168, 164, 152)
@@ -49,6 +57,18 @@ def captures():
                 img.save(f"{base}.avif", quality=58, speed=4)
                 img.save(f"{base}.webp", quality=80, method=6)
             print("captura", name, slug)
+
+
+def app_captures():
+    OUT.mkdir(parents=True, exist_ok=True)
+    for name in APP_SHOTS:
+        src = Image.open(APP_CAPTURES / f"{name}.png").convert("RGB")
+        for w in APP_WIDTHS:
+            img = src if w == src.width else src.resize((w, round(w * src.height / src.width)), Image.LANCZOS)
+            base = OUT / f"databairro-{name}-{w}"
+            img.save(f"{base}.avif", quality=62, speed=4)
+            img.save(f"{base}.webp", quality=84, method=6)
+        print("captura databairro", name)
 
 
 def font(path, size, **axes):
@@ -137,6 +157,10 @@ def icons():
 
 
 if __name__ == "__main__":
+    import sys
+    app_captures()
+    if sys.argv[1:] == ["databairro"]:  # só as telas do DataBairro
+        sys.exit()
     captures()
     og("en", ["WE", "BUILD", "THINGS."], "Independent technology company",
        ["Software", "Products", "Games", "Experiments"])

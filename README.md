@@ -71,6 +71,11 @@ As capturas são do próprio jogo (`TestResults/idiomas` no repositório `stealt
 `python tools/assets.py` (precisa de `pip install pillow fonttools brotli`). O script também refaz as imagens
 Open Graph e os ícones. Depois, `python src/build.py`.
 
+As telas do DataBairro (P—02) são capturas reais da produção (`app.databairro.com.br`), recortadas sem endereço,
+unidade, mapa nem nomes do entorno, e ficam em `tools/capturas/databairro/` (736 × 470; essa pasta não é publicada).
+O app só existe em português: a mesma imagem serve aos dois idiomas. Para trocar, substitua os PNG mantendo o tamanho
+e rode `python tools/assets.py databairro` (gera só essas, sem mexer nas do jogo) e depois `python src/build.py`.
+
 ## Política de privacidade do Escritório 17h58
 
 URL oficial: `https://maedodeam.com.br/privacy.html`. **Não mude esse endereço nem os `id` dos blocos**: o jogo

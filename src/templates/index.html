@@ -138,46 +138,77 @@
           </div>
         </article>
 
-        <article class="project project--saas" id="cotaria" aria-labelledby="p2-title">
+        <article class="project project--saas" id="databairro" aria-labelledby="p2-title">
           <header class="project-head">
-            <p class="label"><span class="project-num">P—02</span> · {{t.cotaria.kicker}}</p>
-            <h3 class="project-name" id="p2-title" data-reveal>Cotaria</h3>
+            <p class="label"><span class="project-num">P—02</span> · {{t.databairro.kicker}}</p>
+            <h3 class="project-name" id="p2-title" data-reveal>DataBairro</h3>
             <ul class="tags" aria-label="Tags">
-              <li>SaaS</li><li>Business systems</li><li>Backend</li><li>Frontend</li><li>Cloud</li><li>Product development</li>
+              <li>Data engineering</li><li>ETL pipelines</li><li>PostGIS</li><li>Geospatial analysis</li><li>Statistical models</li><li>End-to-end</li>
             </ul>
           </header>
 
+          <!-- Telas reais da produção (consulta e resultado), sem endereço, unidade nem mapa -->
+          <div class="gallery gallery--app">
+            <figure class="shot" data-reveal>
+              {{img.db_consulta}}
+              <figcaption><span class="mono">{{t.ui.fig}} 04</span><span>{{t.databairro.cap1}}</span></figcaption>
+            </figure>
+            <figure class="shot" data-reveal style="--d: 1">
+              {{img.db_resultado}}
+              <figcaption><span class="mono">{{t.ui.fig}} 05</span><span>{{t.databairro.cap2}}</span></figcaption>
+            </figure>
+            <figure class="shot" data-reveal style="--d: 2">
+              {{img.db_comparaveis}}
+              <figcaption><span class="mono">{{t.ui.fig}} 06</span><span>{{t.databairro.cap3}}</span></figcaption>
+            </figure>
+          </div>
+
           <div class="project-body">
             <div class="project-copy" data-reveal>
-              <p class="pitch">{{t.cotaria.pitch}}</p>
-              <p>{{t.cotaria.body}}</p>
-              <p>{{t.cotaria.body2}}</p>
+              <p class="pitch">{{t.databairro.pitch}}</p>
+              <p>{{t.databairro.body}}</p>
+              <p>{{t.databairro.body2}}</p>
+              <ul class="points">
+                <li><strong>{{t.databairro.pt1}}</strong> {{t.databairro.pt1d}}</li>
+                <li><strong>{{t.databairro.pt2}}</strong> {{t.databairro.pt2d}}</li>
+                <li><strong>{{t.databairro.pt3}}</strong> {{t.databairro.pt3d}}</li>
+                <li><strong>{{t.databairro.pt4}}</strong> {{t.databairro.pt4d}}</li>
+                <li><strong>{{t.databairro.pt5}}</strong> {{t.databairro.pt5d}}</li>
+                <li><strong>{{t.databairro.pt6}}</strong> {{t.databairro.pt6d}}</li>
+              </ul>
+              <p class="project-cta">
+                <a class="btn arrow" href="{{site.databairro_url}}" rel="noopener" aria-describedby="databairro-access">{{t.databairro.cta}}</a>
+                <span class="soon" id="databairro-access"><span class="led led--pulse" aria-hidden="true"></span>{{t.databairro.access}}</span>
+              </p>
+              <p class="fine">{{t.databairro.disclaimer}}</p>
             </div>
 
             <figure class="sysmap" data-reveal style="--d: 1">
               <div class="sysmap-frame">
-                <p class="sysmap-bar mono"><span>{{t.cotaria.map_title}}</span><span>MVP</span></p>
+                <p class="sysmap-bar mono"><span>{{t.databairro.map_title}}</span><span>PROD</span></p>
                 <ul class="sysmap-apps">
-                  <li>{{t.cotaria.app1}}</li><li>{{t.cotaria.app2}}</li><li>{{t.cotaria.app3}}</li>
+                  <li>{{t.databairro.src1}}</li><li>{{t.databairro.src2}}</li><li>{{t.databairro.src3}}</li>
                 </ul>
-                <p class="sysmap-api"><span class="mono">web</span><span>React · TypeScript</span></p>
+                <p class="sysmap-api"><span class="mono">etl</span><span>Python · pandas · psycopg</span></p>
+                <p class="sysmap-api"><span class="mono">data</span><span>PostgreSQL 17 · PostGIS 3.5</span></p>
                 <p class="sysmap-api"><span class="mono">api</span><span>NestJS · Prisma</span></p>
                 <ul class="sysmap-svc">
-                  <li style="--i: 0">{{t.cotaria.svc1}}</li>
-                  <li style="--i: 1">{{t.cotaria.svc2}}</li>
-                  <li style="--i: 2">{{t.cotaria.svc3}}</li>
-                  <li style="--i: 3">{{t.cotaria.svc4}}</li>
+                  <li style="--i: 0">{{t.databairro.svc1}}</li>
+                  <li style="--i: 1">{{t.databairro.svc2}}</li>
+                  <li style="--i: 2">{{t.databairro.svc3}}</li>
+                  <li style="--i: 3">{{t.databairro.svc4}}</li>
                 </ul>
-                <p class="sysmap-api"><span class="mono">data</span><span>PostgreSQL · Redis</span></p>
+                <p class="sysmap-api"><span class="mono">web</span><span>Next.js · React · MapLibre</span></p>
               </div>
-              <figcaption><span class="mono">{{t.ui.fig}} 04</span><span>{{t.cotaria.cap}}</span></figcaption>
+              <figcaption><span class="mono">{{t.ui.fig}} 07</span><span>{{t.databairro.cap4}}</span></figcaption>
             </figure>
 
             <dl class="spec" data-reveal style="--d: 2">
-              <div><dt>{{t.cotaria.spec_type}}</dt><dd>{{t.cotaria.spec_type_v}}</dd></div>
-              <div><dt>{{t.cotaria.spec_apps}}</dt><dd>{{t.cotaria.spec_apps_v}}</dd></div>
-              <div><dt>{{t.cotaria.spec_stack}}</dt><dd>TypeScript · NestJS · Prisma · PostgreSQL · Redis · React · Docker</dd></div>
-              <div class="status"><dt>{{t.cotaria.spec_status}}</dt><dd><span class="led led--pulse" aria-hidden="true"></span>{{t.cotaria.spec_status_v}}</dd></div>
+              <div><dt>{{t.databairro.spec_type}}</dt><dd>{{t.databairro.spec_type_v}}</dd></div>
+              <div><dt>{{t.databairro.spec_scope}}</dt><dd>{{t.databairro.spec_scope_v}}</dd></div>
+              <div><dt>{{t.databairro.spec_data}}</dt><dd>{{t.databairro.spec_data_v}}</dd></div>
+              <div><dt>{{t.databairro.spec_stack}}</dt><dd>Python · PostgreSQL · PostGIS · NestJS · Next.js · Docker</dd></div>
+              <div class="status"><dt>{{t.databairro.spec_status}}</dt><dd><span class="led led--pulse" aria-hidden="true"></span>{{t.databairro.spec_status_v}}</dd></div>
             </dl>
           </div>
         </article>
@@ -222,9 +253,9 @@
           </li>
           <li class="board-row">
             <span class="led led--pulse" aria-hidden="true"></span>
-            <h3 class="board-name">Cotaria</h3>
+            <h3 class="board-name">DataBairro</h3>
             <p class="board-type">{{t.now.r2_type}}</p>
-            <p class="stages"><span class="vh">{{t.now.stage_label}} {{t.now.st2}}</span><span class="done" aria-hidden="true">{{t.now.st1}}</span><span class="now" aria-hidden="true">{{t.now.st2}}</span><span aria-hidden="true">{{t.now.st3}}</span><span aria-hidden="true">{{t.now.st4}}</span></p>
+            <p class="stages"><span class="vh">{{t.now.stage_label}} {{t.now.st4}}</span><span class="done" aria-hidden="true">{{t.now.st1}}</span><span class="done" aria-hidden="true">{{t.now.st2}}</span><span class="done" aria-hidden="true">{{t.now.st3}}</span><span class="now" aria-hidden="true">{{t.now.st4}}</span></p>
             <p class="board-next"><span class="vh">{{t.now.next_label}}</span>{{t.now.r2_next}}</p>
           </li>
           <li class="board-row board-row--next">

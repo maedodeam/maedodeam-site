@@ -29,6 +29,8 @@ LANGS = {
     "pt-BR": {"dir": "pt-br/", "slug": "pt-br", "og_locale": "pt_BR", "privacy": "pt-BR"},
 }
 WIDTHS = (640, 960, 1440, 1920)
+APP_WIDTHS = (480, 736)  # telas do DataBairro (tools/assets.py), 736 × 470, iguais nos dois idiomas
+DATABAIRRO_URL = "https://app.databairro.com.br/"
 ARROW = '<span class="arw" aria-hidden="true"></span>'
 
 TOKEN = re.compile(r"{{\s*(>)?\s*([\w.\-]+)\s*(\|e)?\s*}}")
@@ -68,6 +70,15 @@ def picture(root, name, slug, alt, sizes, loading="lazy"):
     return (f'<picture><source type="image/avif" srcset="{avif}" sizes="{sizes}">'
             f'<img src="{base}-1440.webp" srcset="{webp}" sizes="{sizes}" width="1920" height="1080" '
             f'alt="{html.escape(alt, quote=True)}" loading="{loading}" decoding="async"></picture>')
+
+
+def app_picture(root, name, alt, sizes):
+    base = f"{root}assets/img/databairro-{name}"
+    avif = ", ".join(f"{base}-{w}.avif {w}w" for w in APP_WIDTHS)
+    webp = ", ".join(f"{base}-{w}.webp {w}w" for w in APP_WIDTHS)
+    return (f'<picture><source type="image/avif" srcset="{avif}" sizes="{sizes}">'
+            f'<img src="{base}-736.webp" srcset="{webp}" sizes="{sizes}" width="736" height="470" '
+            f'alt="{html.escape(alt, quote=True)}" loading="lazy" decoding="async"></picture>')
 
 
 def seo(t, url, alternates, og_image, og_locale, og_alt_locales, og_alt):
@@ -192,6 +203,7 @@ def build():
     out = {}
     tele = telemetry_config()
     site = {"version": version(), "play_version": version("assets/play/game.js", "assets/play/play.css"), "email": EMAIL,
+            "databairro_url": DATABAIRRO_URL,
             # CSP do jogo: sem telemetria, nenhuma conexão; com ela, só o endereço do serviço
             "connect_src": tele["origin"] if tele else "'none'",
             **({k: tele[k] for k in ("policy_date_pt", "policy_date_en", "retention_days")} if tele else {})}
@@ -216,6 +228,8 @@ def build():
             "desk": picture(root, "e1758-desk", cfg["slug"], t["img"]["desk"], "(min-width: 85rem) 54rem, (min-width: 48rem) 64vw, 100vw"),
             "disguise": picture(root, "e1758-disguise", cfg["slug"], t["img"]["disguise"], "(min-width: 85rem) 27rem, (min-width: 48rem) 32vw, 50vw"),
             "caught": picture(root, "e1758-caught", cfg["slug"], t["img"]["caught"], "(min-width: 85rem) 27rem, (min-width: 48rem) 32vw, 50vw"),
+            **{f"db_{n}": app_picture(root, n, t["img"][f"db_{n}"], "(min-width: 85rem) 27rem, (min-width: 60rem) 31vw, 100vw")
+               for n in ("consulta", "resultado", "comparaveis")},
         }
         linkedin = (f'<a class="label" href="{LINKEDIN}" rel="me noopener">{t["about"]["linkedin"]}</a>' if LINKEDIN else "")
 
