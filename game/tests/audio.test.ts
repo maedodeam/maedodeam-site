@@ -2,7 +2,9 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { BARS_PER_LOOP, bpmForTier, keyShiftForTier, MELODY, PROGRESSION, STEPS_PER_BAR, TITLE_MELODY, BASS_ROOTS } from "../src/audio/theory.ts";
+import { createHash } from "node:crypto";
 import { layersFor, stepEvents, surpriseFor, type Arrangement } from "../src/audio/composer.ts";
+import { ACID, acidFilter, PAD } from "../src/audio/synth.ts";
 import { nextGridTime, speedupPlan } from "../src/audio/music.ts";
 import { ANNOUNCEMENTS, LINES, PHONES, SYLLABLES, segsDuration } from "../src/audio/voice.ts";
 import { LIFE_POP_AT, SPEEDUP_TIME } from "../src/core/session.ts";
@@ -90,6 +92,62 @@ describe("compositor", () => {
 
   test("o compositor é determinístico (a mesma volta soa igual)", () => {
     for (let s = 0; s < LOOP; s++) assert.deepEqual(stepEvents(game(5), s), stepEvents(game(5), s));
+  });
+});
+
+describe("baixo ácido 303 e synth psicodélico (versões escolhidas de ouvido em 2026-11)", () => {
+  const loopEvents = (t: number, loop: number) => Array.from({ length: LOOP }, (_, i) => stepEvents(game(t), loop * LOOP + i));
+  const fingerprint = (a: Arrangement) => createHash("sha256").update(JSON.stringify(Array.from({ length: LOOP * 6 }, (_, s) => stepEvents(a, s)))).digest("hex").slice(0, 16);
+
+  test("fases 1–19 e tela inicial idênticas à trilha publicada; do nível 3 em diante, as versões escolhidas", () => {
+    // impressão digital de 6 voltas: níveis 1–2 e tela = commit 09f792d; nível 3+ = 303 suave; nível 4+ = synth em ondas.
+    // Se mudar, a trilha mudou: ouça no laboratório (npm run music-lab) antes de atualizar estes valores.
+    const expected: Record<string, string> = {
+      "title-0": "82bd2e9c6cbaac59", "game-1": "f555445625a0741d", "game-2": "2b9d580b9a9c0b05", "game-3": "64c2ee3a055304e7", "game-4": "39ecea254cb7b5a3",
+      "game-5": "2ce49fb2e3847740", "game-6": "eb414b2a3cda0bb3", "game-7": "28c6d5c7f7cd7ca5", "game-8": "3bc6fc37021ef1ff", "game-12": "ef35dfc61ba336f8",
+    };
+    for (const [key, hash] of Object.entries(expected)) {
+      const [mode, tier] = key.split("-");
+      const a: Arrangement = { mode: mode as "title" | "game", tier: Number(tier), keyShift: mode === "title" ? 0 : keyShiftForTier(Number(tier)) };
+      assert.equal(fingerprint(a), hash, key);
+    }
+  });
+
+  test("303: timbre com teto fixo, menos notas, desenhos que variam e um compasso de respiro com o baixo saltitante", () => {
+    for (let bar = 0; bar < 8; bar++)
+      for (const acc of [false, true]) {
+        const f = acidFilter(bar, acc, 1);
+        assert.ok(f.peak <= 2000, `pico do filtro ${f.peak} Hz`);
+        assert.ok(f.q <= 6);
+      }
+    assert.ok(ACID.drive < 2.5 && ACID.postLp <= 3000);
+    for (const t of [3, 4, 5, 6, 8, 12]) {
+      const ev = loopEvents(t, 0);
+      const perBar = Array.from({ length: 8 }, (_, b) => ev.slice(b * 16, b * 16 + 16).flat());
+      const acidBars = perBar.map((b) => b.filter((e) => e.inst === "acid"));
+      const total = acidBars.reduce((n, b) => n + b.length, 0);
+      assert.ok(total <= 70, `nível ${t}: ${total} notas de 303 por volta (a versão antiga tocava ~115)`);
+      assert.ok(new Set(acidBars.map((b) => JSON.stringify(b.map((e) => e.note! % 12)))).size >= 3, "desenhos diferentes");
+      perBar.forEach((b, i) => {
+        if (!acidBars[i].length) assert.ok(b.some((e) => e.inst === "bass"), `compasso ${i}: sem baixo`);
+      });
+      assert.ok(acidBars.some((b) => !b.length), "um compasso de respiro");
+      for (const s of ev) assert.ok(!(s.some((e) => e.inst === "acid") && s.some((e) => e.inst === "bass")), "dois baixos juntos");
+    }
+  });
+
+  test("synth psicodélico: ondas de 2 compassos com 2 de respiro, timbre redondo, sem agudos", () => {
+    assert.ok(PAD.lp <= 2000 && PAD.wobbleCents <= 15);
+    for (let t = 1; t <= 3; t++) assert.ok(!loopEvents(t, 0).flat().some((e) => e.inst === "pad"), `nível ${t}: sem synth`);
+    for (const t of [4, 6, 8, 12]) {
+      const ev = loopEvents(t, 0);
+      const at = ev.flatMap((s, i) => (s.some((e) => e.inst === "pad") ? [i] : []));
+      assert.deepEqual(at, [0, 64], `nível ${t}: ondas nos compassos 1 e 5`);
+      for (const e of ev.flat().filter((x) => x.inst === "pad")) {
+        assert.ok(e.len >= 24 && e.len <= 32);
+        assert.ok(e.notes!.every((n) => n >= 52 && n <= 76));
+      }
+    }
   });
 });
 

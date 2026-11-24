@@ -235,9 +235,18 @@ function bass(b: Buses, t: number, e: MusicEvent, stepDur: number): void {
   out(b, g);
 }
 
-const ACID_DRIVE = new Map<BaseAudioContext, WaveShaperNode>();
-
-/** 303 ácido: dente de serra → passa-baixa ressonante com envelope; acentos abrem mais o filtro; glide nas ligaduras. */
+/**
+ * 303 ácido: dente de serra → passa-baixa ressonante com envelope; acentos abrem mais o filtro; glide nas ligaduras.
+ * Versão suave (escolhida de ouvido em 2026-11): o filtro tem teto fixo que não sobe com o nível, ressonância
+ * moderada, saturação leve e um passa-baixa depois da saturação para tirar o chiado. Ainda "chora" nos acentos.
+ */
+export const ACID = { q: 5, drive: 1.3, postLp: 2600, delay: 0.04 } as const;
+export function acidFilter(bar: number, accent: boolean, vel: number): { base: number; peak: number; q: number } {
+  const sweep = 0.5 + 0.5 * Math.sin((bar / 8) * Math.PI * 2);
+  const base = 200 + sweep * 260;
+  return { base, peak: base + (accent ? 1100 : 550) * (0.6 + 0.4 * vel), q: ACID.q };
+}
+const ACID_OUT = new Map<BaseAudioContext, AudioNode>();
 function acid(b: Buses, t: number, e: MusicEvent, stepDur: number, bar: number): void {
   const hz = midiToHz(e.note!);
   const len = e.len * stepDur;
@@ -251,26 +260,28 @@ function acid(b: Buses, t: number, e: MusicEvent, stepDur: number, bar: number):
   o.stop(t + len + 0.1);
   b.acid.lastHz = hz;
   b.acid.slideUntil = e.slide ? t + len : 0;
-  // o filtro "respira" ao longo dos compassos e fica mais selvagem nos níveis altos
-  const sweep = 0.5 + 0.5 * Math.sin((bar / 8) * Math.PI * 2);
-  const base = 260 + sweep * 500 + b.tier * 40;
-  const peak = base + (e.accent ? 3200 : 1500) + b.tier * 180;
-  const lp = filter(b, "lowpass", base, 11 + Math.min(10, b.tier * 1.2));
-  lp.frequency.setValueAtTime(peak, t);
-  lp.frequency.setTargetAtTime(base, t + 0.005, e.accent ? 0.09 : 0.05);
+  const f = acidFilter(bar, !!e.accent, e.vel);
+  const lp = filter(b, "lowpass", f.base, f.q);
+  lp.frequency.setValueAtTime(f.peak, t);
+  lp.frequency.setTargetAtTime(f.base, t + 0.005, e.accent ? 0.07 : 0.045);
   const g = b.ctx.createGain();
-  env(g, t, (e.accent ? 0.42 : 0.3) * (0.7 + e.vel * 0.3), 0.003, len * 1.5, 0.75, 0.03, len);
-  let sh = ACID_DRIVE.get(b.ctx);
-  if (!sh) {
-    sh = b.ctx.createWaveShaper();
-    sh.curve = driveCurve(2.5);
-    sh.connect(b.music);
+  env(g, t, (e.accent ? 0.36 : 0.27) * (0.7 + e.vel * 0.3), 0.004, len * 1.5, 0.7, 0.03, len);
+  let input = ACID_OUT.get(b.ctx);
+  if (!input) {
+    const sh = b.ctx.createWaveShaper();
+    sh.curve = driveCurve(ACID.drive);
+    const post = b.ctx.createBiquadFilter();
+    post.type = "lowpass";
+    post.frequency.value = ACID.postLp;
+    post.Q.value = 0.7;
+    sh.connect(post).connect(b.music);
     const d = b.ctx.createGain();
-    d.gain.value = 0.12;
-    sh.connect(d).connect(b.delay);
-    ACID_DRIVE.set(b.ctx, sh);
+    d.gain.value = ACID.delay;
+    post.connect(d).connect(b.delay);
+    ACID_OUT.set(b.ctx, sh);
+    input = sh;
   }
-  o.connect(lp).connect(g).connect(sh);
+  o.connect(lp).connect(g).connect(input);
 }
 
 // ---------------- harmonia e melodia ----------------
@@ -294,23 +305,32 @@ function ep(b: Buses, t: number, e: MusicEvent, stepDur: number): void {
 }
 
 /** Synth psicodélico: dentes de serra desafinados, passa-baixa varrendo devagar. */
+/**
+ * Synth psicodélico (escolhido de ouvido em 2026-11 entre três versões): triângulos redondos, um em cada lado do estéreo, com uma oscilação lenta de
+ * afinação em comum (fita gasta), entrando devagar e saindo devagar. O compositor o toca em ondas de 2 compassos com 2 de respiro.
+ */
+export const PAD = { lp: 1500, gain: 0.07, wobbleHz: 0.45, wobbleCents: 12, detune: 6 } as const;
 function pad(b: Buses, t: number, e: MusicEvent, stepDur: number): void {
   const len = e.len * stepDur;
-  const lp = filter(b, "lowpass", 700, 6);
-  lp.frequency.setValueAtTime(500, t);
-  lp.frequency.linearRampToValueAtTime(2400 + b.tier * 150, t + len * 0.5);
-  lp.frequency.linearRampToValueAtTime(600, t + len);
-  const g = b.ctx.createGain();
-  env(g, t, 0.07 * e.vel * 3, len * 0.25, 0.3, 0.8, 0.25, len);
-  for (const n of e.notes ?? []) {
-    for (const det of [-14, 0, 13]) {
-      const o = osc(b, "sawtooth", midiToHz(n), t, t + len + 0.4);
-      o.detune.value = det + (b.tier >= 6 ? Math.sin(n) * 30 : 0);
+  const end = t + len + 1.1; // release (τ 0,15 s) já ~60 dB abaixo: sem estalo ao desligar
+  const lfo = osc(b, "sine", PAD.wobbleHz, t, end);
+  const depth = b.ctx.createGain();
+  depth.gain.value = PAD.wobbleCents;
+  lfo.connect(depth);
+  const n = Math.max(1, (e.notes ?? []).length);
+  for (const [side, det] of [[-0.6, -PAD.detune], [0.6, PAD.detune]] as const) {
+    const lp = filter(b, "lowpass", PAD.lp, 0.7);
+    const g = b.ctx.createGain();
+    env(g, t, (PAD.gain * e.vel * 3) / Math.sqrt(n / 3), len * 0.3, 0.5, 0.85, 0.45, len);
+    for (const note of e.notes ?? []) {
+      const o = osc(b, "triangle", midiToHz(note), t, end);
+      o.detune.value = det;
+      depth.connect(o.detune);
       o.connect(lp);
     }
+    lp.connect(g);
+    out(b, g, side, 0.45, 0.15);
   }
-  lp.connect(g);
-  out(b, g, 0, 0.35, 0.1);
 }
 
 function lead(b: Buses, t: number, e: MusicEvent, stepDur: number): void {
