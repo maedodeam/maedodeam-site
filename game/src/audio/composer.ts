@@ -3,8 +3,8 @@
 //
 //   nível 1  groove pop: bumbo 4×4 suave, palmas, shaker, baixo saltitante, piano elétrico, melodia
 //   nível 2  + chimbal, cowbell bossa, arpejo de sininho, vocal chops "pa-pi-po" respondendo a melodia
-//   nível 3  + baixo ácido (303) com acentos e glides, breakbeat por baixo, "hey!"
-//   nível 4  + synth psicodélico, melodia dobrada, chops acelerados (esquilo), risadas, lasers
+//   nível 3  + baixo ácido (303) suave, com acentos e glides, breakbeat por baixo, "hey!"
+//   nível 4  + synth psicodélico (ondas de 2 compassos), melodia dobrada, chops acelerados (esquilo), risadas, lasers
 //   nível 5  breakbeat assume, glitch/stutter, surpresas rítmicas no fim das frases
 //   nível 6+ tudo junto, mais rápido, mais estranho (variações na melodia, coros de risada)
 import { BARS_PER_LOOP, BASE_ROOT, BASS_ROOTS, fold, hash01, MELODY, PROGRESSION, STEPS_PER_BAR, TITLE_MELODY, type Mel } from "./theory.ts";
@@ -50,6 +50,19 @@ export interface MusicEvent {
   /** -1 (esquerda) .. 1 (direita) */
   pan?: number;
 }
+
+/**
+ * Baixo ácido 303 (nível ≥ 3), escolhido de ouvido em 2026-11 entre três versões (a "B"): timbre com teto fixo de
+ * brilho e ressonância (ver synth.ts), três desenhos de compasso que se alternam, mais pausas e um compasso de
+ * respiro em que o baixo saltitante das fases 1–19 volta.
+ */
+const ACID: { pat: (number | null)[]; acc: number[]; slide: number[] }[] = [
+  { pat: [0, null, 12, 0, null, 0, 7, null, 0, null, 3, null, 12, null, 0, null], acc: [0, 10], slide: [2] },
+  { pat: [0, null, null, 0, null, 12, null, 0, null, 0, 10, null, 7, null, 5, null], acc: [0, 10], slide: [9] },
+  { pat: [0, null, 0, 12, null, 0, 7, 12, null, 3, null, 5, 7, null, 12, null], acc: [0, 7, 12], slide: [6, 11] },
+];
+/** Qual desenho em cada compasso da volta; -1 = compasso de respiro (baixo saltitante no lugar do 303). */
+const ACID_BARS = [0, 1, 0, -1, 0, 1, 1, 2];
 
 export interface Arrangement {
   mode: "title" | "game";
@@ -174,19 +187,20 @@ export function stepEvents(a: Arrangement, globalStep: number): MusicEvent[] {
 
   // ---------------- baixo ----------------
   const root = BASE_ROOT + k + BASS_ROOTS[bar];
-  if (L.has("bass-bounce") && !stopped) {
+  // no compasso de respiro do 303 o baixo saltitante assume
+  const acidBar = L.has("acid") ? ACID_BARS[bar] : 0;
+  if ((L.has("bass-bounce") || acidBar < 0) && !stopped) {
     // root-oitava saltitante (funk de Shibuya)
     const map: Record<number, number> = { 0: 0, 2: 12, 4: 0, 6: 12, 7: 0, 9: 0, 10: 12, 12: 0, 14: 12 };
     if (step in map) ev.push({ inst: "bass", at: sw, note: fold(root + map[step], 33, 57), vel: step % 4 === 0 ? 0.75 : 0.55, len: 1.6 });
   }
-  if (L.has("acid") && !stopped) {
-    const pat = [0, 0, 12, 0, 7, 0, 10, 12, 0, 0, 3, 0, 12, 7, 0, 5];
-    const acc = [0, 3, 7, 10, 14];
-    const rest = h(4) < 0.12 && step % 4 !== 0;
-    if (!rest) {
-      const note = fold(root, 31, 43) + pat[step];
-      const slide = h(5) < 0.3 + (t - 3) * 0.05;
-      ev.push({ inst: "acid", at: 0, note, vel: acc.includes(step) ? 0.9 : 0.6, accent: acc.includes(step), slide, len: slide ? 1.05 : 0.7 });
+  if (L.has("acid") && acidBar >= 0 && !stopped) {
+    const p = ACID[acidBar];
+    const off = p.pat[step];
+    if (off !== null) {
+      const accent = p.acc.includes(step);
+      const slide = p.slide.includes(step);
+      ev.push({ inst: "acid", at: 0, note: fold(root, 31, 43) + off, vel: accent ? 0.85 : 0.55 + h(4) * 0.1, accent, slide, len: slide ? 1.05 : 0.7 });
     }
   }
 
@@ -195,7 +209,8 @@ export function stepEvents(a: Arrangement, globalStep: number): MusicEvent[] {
     if (step === 0) ev.push({ inst: "ep", at: 0, notes: chordAt(bar, k, 57, 77), vel: t >= 4 ? 0.22 : 0.34, len: 5 });
     if (step === 6 || step === 10 || (t >= 2 && step === 14)) ev.push({ inst: "ep", at: sw, notes: chordAt(bar, k, 60, 79), vel: 0.26, len: 1.2 });
   }
-  if (L.has("pad") && step === 0) ev.push({ inst: "pad", at: 0, notes: chordAt(bar, k, 52, 76), vel: 0.3, len: 16 });
+  // synth psicodélico (escolhido de ouvido em 2026-11): ondas de 2 compassos, com 2 de respiro (compassos 1–2 e 5–6)
+  if (L.has("pad") && step === 0 && bar % 4 === 0) ev.push({ inst: "pad", at: 0, notes: chordAt(bar, k, 55, 74), vel: 0.3, len: 30 });
   if (L.has("arp") && !stopped && (t >= 3 || step % 2 === 0)) {
     const ch = chordAt(bar, k, 72, 94);
     const seq = [0, 1, 2, 3, 2, 1];

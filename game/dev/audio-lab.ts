@@ -5,6 +5,7 @@ import { MusicEngine } from "../src/audio/music.ts";
 import { ANNOUNCEMENTS, renderAnnouncement, renderSyllable, SYLLABLES } from "../src/audio/voice.ts";
 import { bpmForTier } from "../src/audio/theory.ts";
 import { SPEEDUP_TIME } from "../src/core/session.ts";
+import { clicks, measure, type Metrics } from "./music-analysis.ts";
 
 const SR = 44100;
 
@@ -184,5 +185,142 @@ async function profile(tier: number, seconds: number, without: string[]): Promis
   return { ms, realtime: (seconds * 1000) / ms };
 }
 
-(window as unknown as Record<string, unknown>).lab = { renderJourney, renderVoices, profile, renderDiagnostics, monsterizeWav };
+let SYL_CACHE: Map<string, AudioBuffer> | null = null;
+async function syllables(): Promise<Map<string, AudioBuffer>> {
+  if (!SYL_CACHE) {
+    SYL_CACHE = new Map();
+    for (const id of Object.keys(SYLLABLES)) SYL_CACHE.set(id, await renderSyllable(id, SR));
+  }
+  return SYL_CACHE;
+}
+
+/**
+ * Diagnóstico da trilha: renderiza `bars` compassos de um nível com a mesma cadeia do jogo (música 0,55 → master
+ * 0,85 → limitador) e mede o resultado. `only`/`without` filtram instrumentos do compositor; `cues` simula os
+ * microgames do nível (contagem regressiva + vinhetas de vitória/derrota), que tocam por cima da música.
+ * Renderiza uma volta (8 compassos) por vez e junta: um contexto offline com milhares de notas agendadas de uma vez
+ * fica quadraticamente lento (no jogo as notas são agendadas aos poucos, então isso não acontece lá).
+ * Canais 0–1 = saída final (depois do limitador); 2–3 = soma crua (antes do limitador), para ver o quanto ele trabalha.
+ */
+async function renderLoop(
+  tier: number,
+  loop: number,
+  opts: { only?: string[]; without?: string[]; cues?: boolean },
+): Promise<{ ch: Float32Array[]; events: number; nodes: number; ms: number }> {
+  const bar = (4 * 60) / bpmForTier(tier);
+  const lead = 0.05;
+  const len = Math.round(8 * bar * SR);
+  const ctx = new OfflineAudioContext(4, Math.ceil(lead * SR) + len + Math.ceil(0.3 * SR), SR);
+  // custo para o celular: quantos nós de áudio a trilha cria (osciladores, filtros, ganhos, fontes de amostra)
+  let nodes = 0;
+  for (const m of ["createOscillator", "createBufferSource", "createBiquadFilter", "createGain", "createWaveShaper", "createStereoPanner"] as const) {
+    const orig = (ctx as any)[m].bind(ctx);
+    (ctx as any)[m] = (...a: unknown[]) => {
+      nodes++;
+      return orig(...a);
+    };
+  }
+  const merger = ctx.createChannelMerger(4);
+  merger.connect(ctx.destination);
+  const master = ctx.createGain();
+  master.gain.value = 0.85;
+  const lim = ctx.createDynamicsCompressor();
+  lim.threshold.value = -10;
+  lim.knee.value = 6;
+  lim.ratio.value = 8;
+  lim.attack.value = 0.002;
+  lim.release.value = 0.15;
+  master.connect(lim);
+  const s1 = ctx.createChannelSplitter(2);
+  lim.connect(s1);
+  s1.connect(merger, 0, 0);
+  s1.connect(merger, 1, 1);
+  const s2 = ctx.createChannelSplitter(2);
+  master.connect(s2);
+  s2.connect(merger, 0, 2);
+  s2.connect(merger, 1, 3);
+  const musicGain = ctx.createGain();
+  musicGain.gain.value = 0.55;
+  musicGain.connect(master);
+  const eng = new MusicEngine(ctx, musicGain, await syllables());
+  eng.manual = true;
+  const { stepEvents } = await import("../src/audio/composer.ts");
+  const all = ["kick", "snare", "clap", "ghost", "hat", "ohat", "shaker", "cowbell", "rim", "tom", "crash", "bass", "acid", "ep", "pad", "lead", "bell", "arp", "chop", "laugh", "zap"];
+  const keep = opts.only?.length ? new Set(opts.only) : null;
+  eng.filterOut = new Set(all.filter((i) => (keep ? !keep.has(i) : false) || (opts.without ?? []).includes(i)));
+  eng.clock = 0;
+  eng.start("game", tier, lead);
+  eng.globalStep = loop * 128;
+  let events = 0;
+  for (let s = loop * 128; s < (loop + 1) * 128; s++) events += stepEvents(eng.arrangement, s).filter((e) => !eng.filterOut!.has(e.inst)).length;
+  const end = lead + 8 * bar;
+  const at = (t: number) => {
+    eng.advance(t);
+    eng.clock = t;
+  };
+  if (opts.cues) {
+    const { scheduleSeconds } = await import("../src/core/difficulty.ts");
+    const { betweenTime } = await import("../src/core/session.ts");
+    const dur = scheduleSeconds((tier - 1) * 10 + 5);
+    let g = lead + 0.3 - ((loop * 8 * bar) % (dur + betweenTime(tier) + 0.6));
+    let k = loop * 3;
+    while (g + dur < end) {
+      const e = g + dur;
+      if (e - 2.2 > lead) {
+        at(e - 2.2);
+        eng.countdown(e);
+        at(e - 0.15);
+        eng.stopCountdown();
+        eng.stinger(k % 4 === 3 ? "lose" : "win");
+      }
+      g = e + betweenTime(tier) + 0.6;
+      k++;
+    }
+  }
+  const t0 = performance.now();
+  at(end);
+  eng.stop();
+  const buf = await ctx.startRendering();
+  const ms = performance.now() - t0;
+  const o = Math.ceil(lead * SR);
+  return { ch: [0, 1, 2, 3].map((i) => buf.getChannelData(i).slice(o, o + len)), events, nodes, ms };
+}
+
+async function analyzeTier(
+  tier: number,
+  opts: { bars?: number; only?: string[]; without?: string[]; cues?: boolean; wav?: boolean } = {},
+): Promise<{ out: Metrics; raw: Metrics; events: number; perSecond: number; nodesPerSecond: number; renderMsPerSecond: number; clicks: number; wav?: string }> {
+  const loops = Math.max(1, Math.ceil((opts.bars ?? 16) / 8));
+  const parts: { ch: Float32Array[]; events: number; nodes: number; ms: number }[] = [];
+  for (let l = 0; l < loops; l++) parts.push(await renderLoop(tier, l, opts));
+  // estalos: medidos em cada volta separadamente (a emenda entre voltas renderizadas à parte não conta)
+  let clickCount = 0;
+  for (const p of parts) clickCount += clicks(p.ch[2], SR) + clicks(p.ch[3], SR);
+  const n = parts.reduce((s, p) => s + p.ch[0].length, 0);
+  const ch = [0, 1, 2, 3].map((i) => {
+    const a = new Float32Array(n);
+    let o = 0;
+    for (const p of parts) {
+      a.set(p.ch[i], o);
+      o += p.ch[i].length;
+    }
+    return a;
+  });
+  const events = parts.reduce((s, p) => s + p.events, 0);
+  const out = measure(ch[0], ch[1], SR, 0.25);
+  const raw = measure(ch[2], ch[3], SR, 0.25);
+  let wav: string | undefined;
+  if (opts.wav) {
+    const st = new AudioBuffer({ numberOfChannels: 2, length: n, sampleRate: SR });
+    st.copyToChannel(ch[0], 0);
+    st.copyToChannel(ch[1], 1);
+    wav = b64(toWav(st));
+  }
+  const secs = n / SR;
+  const nodes = parts.reduce((s, p) => s + p.nodes, 0);
+  const ms = parts.reduce((s, p) => s + p.ms, 0);
+  return { out, raw, events, perSecond: events / secs, nodesPerSecond: nodes / secs, renderMsPerSecond: ms / secs, clicks: clickCount, wav };
+}
+
+(window as unknown as Record<string, unknown>).lab = { renderJourney, renderVoices, profile, renderDiagnostics, monsterizeWav, analyzeTier };
 document.body.dataset.ready = "true";
