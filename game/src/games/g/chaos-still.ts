@@ -1,5 +1,6 @@
-// 124 · FIND THE CALM! — WTF insano: tudo gira, balança e muda de cor num caleidoscópio (xícaras, grampeadores, gatos...).
-// Exatamente UM objeto está parado, sem movimento nenhum. Toque nele. Tocar num que se mexe = perde.
+// 124 · FIND THE CALMEST! — WTF insano: tudo gira, chacoalha e muda de cor num caleidoscópio (xícaras, grampeadores,
+// gatos...). Exatamente UM objeto está parado, sem movimento nenhum: o mais calmo. Toque nele. Tocar num que se mexe = perde.
+// Os outros se agitam bem (giro, órbita, pulsação e tremedeira, todos juntos), para o calmo saltar aos olhos.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -18,6 +19,8 @@ interface Obj {
   orbitR: number;
   orbitW: number;
   pulse: number;
+  /** Tremedeira rápida (unidades). */
+  jit: number;
   phase: number;
   rot: number;
   scale: number;
@@ -85,7 +88,6 @@ function setup(api: MicroAPI): MicroInstance {
   const size = Math.min(cw, ch);
   const objs: Obj[] = [];
   const still = rng.int(0, n - 1);
-  const gentle = lv >= 0.5;
   for (let i = 0; i < n; i++) {
     const r = Math.floor(i / cols);
     const inRow = Math.min(cols, n - r * cols);
@@ -93,19 +95,21 @@ function setup(api: MicroAPI): MicroInstance {
     const x0 = 40 + (w - 80 - inRow * cw) / 2 + (c + 0.5) * cw + rng.range(-0.08, 0.08) * cw;
     const y0 = top + (r + 0.5) * ch + rng.range(-0.08, 0.08) * ch;
     const isStill = i === still;
-    // decoys: sempre com algum movimento contínuo e visível (nunca param)
-    const mode = rng.int(0, 2);
-    const strong = !gentle || rng.chance(0.4);
+    // decoys: todos bem agitados ao mesmo tempo (giro + órbita + pulsação + tremedeira); nos níveis altos a agitação
+    // cai um pouco, mas nunca a ponto de algum parecer parado
+    const calm = Math.min(1, lv) * 0.3;
+    const k = size / 300;
     objs.push({
       hx: x0,
       hy: y0,
       x: x0,
       y: y0,
       kind: rng.int(0, 7),
-      spin: isStill ? 0 : (mode !== 1 || strong ? rng.range(strong ? 1.8 : 0.9, strong ? 3.2 : 1.4) : 0) * rng.sign(),
-      orbitR: isStill ? 0 : mode !== 0 || strong ? (strong ? rng.range(16, 26) : rng.range(12, 16)) * (size / 300) : 0,
-      orbitW: rng.range(2.6, 4) * rng.sign(),
-      pulse: isStill ? 0 : strong ? 0.12 : mode === 2 ? 0.08 : 0,
+      spin: isStill ? 0 : rng.range(2.2, 3.8) * (1 - calm) * rng.sign(),
+      orbitR: isStill ? 0 : rng.range(24, 36) * (1 - calm) * k,
+      orbitW: rng.range(3, 4.6) * rng.sign(),
+      pulse: isStill ? 0 : rng.range(0.12, 0.18) * (1 - calm),
+      jit: isStill ? 0 : rng.range(4, 7) * k,
       phase: rng.range(0, 6.28),
       rot: 0,
       scale: 1,
@@ -116,8 +120,8 @@ function setup(api: MicroAPI): MicroInstance {
 
   function place(t: number): void {
     for (const o of s.objs) {
-      o.x = o.hx + Math.cos(t * o.orbitW + o.phase) * o.orbitR;
-      o.y = o.hy + Math.sin(t * o.orbitW + o.phase) * o.orbitR;
+      o.x = o.hx + Math.cos(t * o.orbitW + o.phase) * o.orbitR + Math.sin(t * 31 + o.phase * 3) * o.jit;
+      o.y = o.hy + Math.sin(t * o.orbitW + o.phase) * o.orbitR + Math.cos(t * 27 + o.phase * 5) * o.jit;
       o.rot = o.spin * t + (o.spin ? o.phase : 0);
       o.scale = 1 + Math.sin(t * 7 + o.phase) * o.pulse;
     }
@@ -208,7 +212,7 @@ export const chaosStill: Entry<S> = {
     id: "chaos-still",
     num: 124,
     name: { en: "Find the Calm", pt: "Acha a Calma" },
-    verb: { en: "FIND THE CALM!", pt: "ACHA A CALMA!" },
+    verb: { en: "FIND THE CALMEST!", pt: "ACHA O MAIS CALMO!" },
     hint: { pointer: "tap" },
     category: "perception",
     family: "tap",
@@ -216,8 +220,8 @@ export const chaosStill: Entry<S> = {
     difficulty: 2,
     wtf: "insane",
     mechanic:
-      "WTF insane: a kaleidoscope where cups, staplers, cats and plants spin, wobble and change color. Exactly one object is perfectly still: tap it. Later there are more objects, some only drift gently, and the calm one also changes color.",
-    winText: "Tap the only object that isn't moving.",
+      "WTF insane: a kaleidoscope where cups, staplers, cats and plants spin, orbit, pulse, jitter and change color, all at once. Exactly one object is perfectly still, the calmest one: tap it. Later there are more objects, the others shake a little less (never to a stop), and the calm one also changes color.",
+    winText: "Tap the calmest object: the only one that isn't moving.",
     loseText: "Tap a moving object, or run out of time.",
     timeScale: 1.2,
     minTime: 3,

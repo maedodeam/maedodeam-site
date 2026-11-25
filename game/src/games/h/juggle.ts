@@ -1,5 +1,6 @@
 // 132 · JUGGLE! — malabares no intervalo do café. As bolas fazem arcos de uma mão para a outra.
-// Toque numa bola quando ela estiver descendo dentro da faixa das mãos para jogá-la de novo. Bola no chão = perde.
+// Toque em qualquer lugar da tela (ou Espaço) quando uma bola estiver descendo dentro da faixa das mãos: a mais baixa
+// é jogada de novo. Fora da hora (nenhuma bola na faixa), o toque não faz nada. Bola no chão = perde.
 // Nos níveis altos entra a 3ª bola e tudo cai mais depressa.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
@@ -31,6 +32,16 @@ interface S {
   flash: number;
   t: number;
   endT: number;
+}
+
+/** A bola que um toque jogaria agora: a mais baixa entre as que estão descendo dentro da faixa das mãos. */
+function nextBall(s: S): Ball | null {
+  let best: Ball | null = null;
+  for (const b of s.balls) {
+    if (!b.live || b.vy <= 0 || b.y < s.zoneTop - 20) continue;
+    if (!best || b.y > best.y) best = b;
+  }
+  return best;
 }
 
 function setup(api: MicroAPI): MicroInstance {
@@ -104,18 +115,9 @@ function setup(api: MicroAPI): MicroInstance {
           return;
         }
       }
-      const inp = api.input;
-      if (!inp.pressed) return;
-      let best: Ball | null = null;
-      let bd = 150;
-      for (const b of s.balls) {
-        if (!b.live || b.vy <= 0 || b.y < s.zoneTop - 20) continue;
-        const d = Math.hypot(inp.x - b.x, inp.y - b.y);
-        if (d < bd) {
-          bd = d;
-          best = b;
-        }
-      }
+      // toque em qualquer lugar: joga a bola que está nas mãos; sem bola na faixa, nada acontece
+      if (!api.input.actionPressed) return;
+      const best = nextBall(s);
       if (best) {
         toss(best);
         api.sfx("jump");
@@ -152,9 +154,10 @@ function setup(api: MicroAPI): MicroInstance {
         const squash = i === s.dropped ? 0.6 : 1;
         g.ellipse(b.x, b.y - (1 - squash) * r * 0.5, r / squash, r * squash, b.color);
         g.arc(b.x, b.y, r * 0.6, b.spin, b.spin + 1.6, C.white, 8);
-        const ready = b.live && b.vy > 0 && b.y >= s.zoneTop - 20 && !api.result;
-        if (ready) g.circle(b.x, b.y, r + 16, null, { stroke: C.white, lw: 6 });
       }
+      // a bola que o próximo toque joga
+      const ready = api.result ? null : nextBall(s);
+      if (ready) g.circle(ready.x, ready.y, 52 + 16, null, { stroke: C.white, lw: 6 });
     },
   };
 }
@@ -165,13 +168,13 @@ export const juggle: Entry<S> = {
     num: 132,
     name: { en: "Juggle", pt: "Malabares" },
     verb: { en: "JUGGLE!", pt: "MALABARISMO!" },
-    hint: { pointer: "tap" },
+    hint: { pointer: "tap", keys: "space" },
     category: "timing",
     family: "tap",
     goal: "survive",
     difficulty: 2,
     mechanic:
-      "Two balls (three later) arc from one hand of the juggler to the other. Tap a ball while it's falling inside the hand zone at the bottom to toss it up again. Tapping it too high does nothing. Balls fall faster on harder levels.",
+      "Two balls (three later) arc from one hand of the juggler to the other. Tap anywhere (or press Space) while a ball is falling inside the hand zone at the bottom: the lowest one is tossed up again. Tapping when no ball is in the zone does nothing. Balls fall faster on harder levels.",
     winText: "Keep every ball in the air until time runs out.",
     loseText: "A ball hits the floor.",
     bg: BG.yellow,
@@ -181,22 +184,15 @@ export const juggle: Entry<S> = {
     ? {
         win(s, api, io) {
           if (api.result || io.isDown) return;
-          let best = null;
-          for (const b of s.balls) {
-            if (!b.live || b.vy <= 0 || b.y < s.zoneTop + 30) continue;
-            if (!best || b.y > best.y) best = b;
-          }
-          if (best) io.tap(best.x + best.vx / 60, best.y + best.vy / 60);
+          const best = nextBall(s);
+          // toca num canto qualquer da tela quando a bola já entrou bem na faixa
+          if (best && best.y > s.zoneTop + 30) io.tap(api.w * 0.1, api.h * 0.3);
         },
         lose(s, api, io) {
           if (api.result || io.isDown) return;
-          // afobado: toca na bola alto demais, antes de ela chegar nas mãos
-          for (const b of s.balls) {
-            if (b.live && b.vy > 0 && b.y > s.apexY + 60 && b.y < s.zoneTop - 120) {
-              io.tap(b.x, b.y);
-              return;
-            }
-          }
+          // afobado: toca enquanto nenhuma bola está nas mãos (não faz nada) e trava quando ela chega
+          const b = s.balls.find((x) => x.live && x.vy > 0);
+          if (!nextBall(s) && b && b.y < s.zoneTop - 150) io.tap(api.w / 2, api.h / 2);
         },
       }
     : null,

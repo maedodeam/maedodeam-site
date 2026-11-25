@@ -1,10 +1,11 @@
 // 118 · BUTTON UP! — WTF: o botão da camisa do chefe está por um fio (a camisa range, o mundo derrete em volta).
-// Arraste a agulha alternando entre os dois furos do botão (A→B→A…); cada passada dá um ponto. 4 pontos (6 depois).
+// A agulha segue o mouse (no toque, arraste em qualquer lugar da tela) alternando entre os dois furos do botão
+// (A→B→A…); cada passada dá um ponto. 4 pontos (6 depois).
 // Se o tempo acabar, o botão voa longe (boing).
-import type { Entry, MicroAPI, MicroInstance, Point } from "../../core/types.ts";
+import type { BotIO, Entry, MicroAPI, MicroInstance, Point } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
-import { segDist } from "../../kit/mover.ts";
+import { segDist, steer } from "../../kit/mover.ts";
 import { psyBackdrop, psyWash, wobbleText, psyColor } from "../../gfx/wtf.ts";
 import { mem, moveToward } from "../../testing/botkit.ts";
 import { isPortrait } from "./util.ts";
@@ -19,8 +20,6 @@ interface S {
   hr: number;
   breath: number;
   tip: Point;
-  offX: number;
-  offY: number;
   target: number;
   started: boolean;
   stitches: number;
@@ -34,6 +33,8 @@ interface S {
   t: number;
   endT: number;
 }
+
+const TOUCH_GAIN = 1.25;
 
 function holes(s: S): Point[] {
   return [
@@ -59,8 +60,6 @@ function setup(api: MicroAPI): MicroInstance {
     hr: 64 - lv * 8,
     breath: lv < 0.5 ? 0 : 34 + (lv - 0.5) * 40,
     tip: { x: bx + (portrait ? 270 : 330), y: by - 170 },
-    offX: 0,
-    offY: 0,
     target: 0,
     started: false,
     stitches: 0,
@@ -104,16 +103,9 @@ function setup(api: MicroAPI): MicroInstance {
         api.sfx("wobble");
         s.creak = 1.3;
       }
-      const inp = api.input;
+      // a ponta da agulha vai com o mouse, sem precisar clicar nela; no toque, arrastar em qualquer lugar a move
       const prev = { x: s.tip.x, y: s.tip.y };
-      if (inp.pressed) {
-        s.offX = s.tip.x - inp.x;
-        s.offY = s.tip.y - inp.y;
-      }
-      if (inp.down) {
-        s.tip.x = Math.max(30, Math.min(w - 30, inp.x + s.offX));
-        s.tip.y = Math.max(30, Math.min(h - 30, inp.y + s.offY));
-      }
+      steer(api.input, s.tip, { axis: "xy", keySpeed: 0, maxSpeed: 9000, touchGain: TOUCH_GAIN, minX: 30, maxX: w - 30, minY: 30, maxY: h - 30 }, dt);
       const hs = holes(s);
       const tg = hs[s.target];
       if (segDist(tg, prev, s.tip) <= s.hr) {
@@ -240,20 +232,34 @@ function setup(api: MicroAPI): MicroInstance {
   };
 }
 
+/** Bot: leva a ponta da agulha até `goal` (mouse: o ponteiro é a agulha; toque: arrasta com o ganho do toque). */
+function needleTo(s: S, api: MicroAPI, io: BotIO, goal: Point, speed: number, dt: number): void {
+  if (api.input.mode === "touch" || (io as { touch?: boolean }).touch) {
+    if (!io.isDown) {
+      io.down(api.w / 2, api.h * 0.85);
+      return;
+    }
+    moveToward(io, { x: io.px + (goal.x - s.tip.x) / TOUCH_GAIN, y: io.py + (goal.y - s.tip.y) / TOUCH_GAIN }, speed / TOUCH_GAIN, dt);
+  } else {
+    if (io.px === 0 && io.py === 0) io.move(s.tip.x, s.tip.y);
+    moveToward(io, goal, speed, dt);
+  }
+}
+
 export const sewButton: Entry<S> = {
   def: {
     id: "sew-button",
     num: 118,
     name: { en: "Button Up", pt: "Aperta o Botão" },
     verb: { en: "BUTTON UP!", pt: "APERTA O BOTÃO!" },
-    hint: { pointer: "drag" },
+    hint: { pointer: "move" },
     category: "absurd",
     family: "drag",
     goal: "complete",
     difficulty: 1,
     wtf: "normal",
     mechanic:
-      "WTF: the boss's shirt button is about to pop while the room melts around him. Drag the needle back and forth between the button's two holes (A→B→A…); each pass sews a stitch. 4 stitches at first, 6 later, when the shirt also breathes and the button bobs.",
+      "WTF: the boss's shirt button is about to pop while the room melts around him. The needle follows the mouse (on touch, drag anywhere on the screen); move it back and forth between the button's two holes (A→B→A…); each pass sews a stitch. 4 stitches at first, 6 later, when the shirt also breathes and the button bobs.",
     winText: "Sew enough stitches before time runs out.",
     loseText: "Run out of time: the button flies off.",
     timeScale: 1.25,
@@ -265,29 +271,16 @@ export const sewButton: Entry<S> = {
     ? {
         win(s, api, io, dt) {
           if (api.result || api.time < 0.05) return;
-          if (!io.isDown) {
-            io.move(s.tip.x, s.tip.y);
-            io.down(s.tip.x, s.tip.y);
-            return;
-          }
-          const tg = holes(s)[s.target];
-          moveToward(io, { x: tg.x - s.offX, y: tg.y - s.offY }, 1800, dt);
+          needleTo(s, api, io, holes(s)[s.target], 1800, dt);
         },
         lose(s, api, io, dt) {
           if (api.result || api.time < 0.05) return;
           const m = mem(s, () => ({ leg: 0 }));
-          if (!io.isDown) {
-            io.move(s.tip.x, s.tip.y);
-            io.down(s.tip.x, s.tip.y);
-            return;
-          }
           // erra o furo B: espeta a camisa logo abaixo dele
           const hs = holes(s);
           const goal = m.leg === 0 ? hs[0] : { x: hs[1].x + 40, y: hs[1].y + 190 };
-          const px = goal.x - s.offX;
-          const py = goal.y - s.offY;
-          moveToward(io, { x: px, y: py }, 1500, dt);
-          if (Math.hypot(io.px - px, io.py - py) < 8) m.leg = 1 - m.leg;
+          needleTo(s, api, io, goal, 1500, dt);
+          if (Math.hypot(s.tip.x - goal.x, s.tip.y - goal.y) < 10) m.leg = 1 - m.leg;
         },
       }
     : null,

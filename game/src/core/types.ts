@@ -60,6 +60,11 @@ export interface MicrogameDef {
   /** Duração mínima em segundos, mesmo nas velocidades altas. Padrão 2.6. */
   minTime?: number;
   /**
+   * Segundos em que o microgame continua na tela depois do resultado (sem entrada). Padrão: AFTERMATH (0,6 s). Só
+   * para quem precisa mostrar a resposta com uma animação (ex.: a folha se desdobrando).
+   */
+  aftermath?: number;
+  /**
    * WTF Moment: desafio absurdo que quebra a expectativa (mas tem lógica e dá para vencer).
    * O sequenciador os sorteia à parte: o primeiro entre a 8ª e a 12ª fase, depois um a cada ~8–12.
    * "insane" = ainda mais absurdo e psicodélico; só sai depois da 30ª fase.
