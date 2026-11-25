@@ -411,7 +411,7 @@ describe("sessão (máquina de estados da partida)", () => {
     s.start();
     let guard = 0;
     while (s.played < 10 && guard++ < 20000) step(1);
-    assert.equal(s.lives, START_LIVES);
+    assert.equal(s.lives, START_LIVES + 1, "10 sem errar = vida extra");
     assert.equal(s.wins, 10);
     assert.ok(s.score >= 1000);
     assert.equal(s.phase, "speedup");
@@ -461,7 +461,7 @@ describe("sessão (máquina de estados da partida)", () => {
     return { s, events, step };
   }
 
-  test("nos marcos 10, 20, 30, 40, 50: +1 vida junto com a transição, nunca acima de 4", () => {
+  test("nos marcos 10, 20, 30, 40, 50: +1 vida junto com a transição; errando em toda dezena, nunca acima de 4", () => {
     // perde 2 nas primeiras dez, depois 1 por dezena
     const lose = new Set([2, 5, 13, 24, 36, 47]);
     const { s, events, step } = scripted((k) => lose.has(k), 3);
@@ -494,15 +494,50 @@ describe("sessão (máquina de estados da partida)", () => {
     assert.equal(s.lifeBonus, true);
   });
 
-  test("com 4 vidas, a transição não dá vida nem mostra o bônus", () => {
+  test("10 seguidos sem errar: vida extra mesmo com 4, e vai acumulando (5, 6, 7)", () => {
     const { s, step, events } = runSession({ behave: "win" });
     s.start();
+    const livesAt: Record<number, number> = {};
     let guard = 0;
-    while (s.played < 10 && guard++ < 20000) step(1);
-    assert.equal(s.phase, "speedup");
+    while (s.played < 31 && guard++ < 400000) {
+      step(1);
+      if (s.phase === "speedup" && livesAt[s.played] === undefined) livesAt[s.played] = s.lives;
+    }
+    assert.deepEqual(livesAt, { 10: START_LIVES + 1, 20: START_LIVES + 2, 30: START_LIVES + 3 });
+    assert.deepEqual(
+      events.filter((e) => e.type === "speedup").map((e) => e.type === "speedup" && e.life),
+      [true, true, true],
+    );
+  });
+
+  test("com 4 ou mais vidas e alguma derrota na dezena, a transição não dá vida nem mostra o bônus", () => {
+    // 1–10 sem errar (5 vidas); perde o 15 (4 vidas): no marco 20 não ganha, porque errou
+    const { s, step, events } = scripted((k) => k === 15, 6);
+    s.start();
+    let guard = 0;
+    while (s.played < 20 && guard++ < 400000) step();
+    while (s.phase !== "speedup" && guard++ < 400000) step();
+    assert.equal(s.played, 20);
     assert.equal(s.lives, START_LIVES);
     assert.equal(s.lifeBonus, false);
-    assert.ok(events.some((e) => e.type === "speedup" && !e.life));
+    assert.deepEqual(
+      events.filter((e) => e.type === "speedup").map((e) => e.type === "speedup" && e.life),
+      [true, false],
+    );
+  });
+
+  test("abaixo de 4 vidas a recuperação continua valendo, mesmo errando na dezena", () => {
+    // perde 3 e 7 (2 vidas) → marco 10: 3; perde 12 (2) → marco 20: 3; sem erros 21–30 → marco 30: 4
+    const lose = new Set([3, 7, 12]);
+    const { s, step } = scripted((k) => lose.has(k), 9);
+    s.start();
+    const livesAt: Record<number, number> = {};
+    let guard = 0;
+    while (s.played < 31 && guard++ < 400000) {
+      step();
+      if (s.phase === "speedup" && livesAt[s.played] === undefined) livesAt[s.played] = s.lives;
+    }
+    assert.deepEqual(livesAt, { 10: 3, 20: 3, 30: 4 });
   });
 
   test("perder a última vida justamente no 10º: fim de jogo, sem transição nem vida extra", () => {
@@ -523,16 +558,24 @@ describe("sessão (máquina de estados da partida)", () => {
     const { s } = runSession();
     s.start();
     s.lives = 2;
-    const grant = (s as unknown as { grantMilestoneLife(p: number): boolean }).grantMilestoneLife.bind(s);
+    const priv = s as unknown as { grantMilestoneLife(p: number): boolean; lostSinceMilestone: boolean };
+    const grant = priv.grantMilestoneLife.bind(s);
+    const lostOne = () => (priv.lostSinceMilestone = true);
+    lostOne();
     assert.equal(grant(10), true);
     assert.equal(grant(10), false);
     assert.equal(s.lives, 3);
+    lostOne();
     assert.equal(grant(20), true);
     assert.equal(s.lives, 4);
-    assert.equal(grant(30), false, "já está no máximo");
+    lostOne();
+    assert.equal(grant(30), false, "com 4 e errou na dezena: sem vida");
     assert.equal(s.lives, 4);
+    assert.equal(grant(40), true, "dezena sem erro: vida extra acima de 4");
+    assert.equal(grant(40), false, "uma vez por marco");
+    assert.equal(s.lives, 5);
     s.lives = 0;
-    assert.equal(grant(40), false, "sem vida não recupera");
+    assert.equal(grant(50), false, "sem vida não recupera");
   });
 
   test("a vida extra não muda a duração da transição nem tira tempo do microgame seguinte", () => {

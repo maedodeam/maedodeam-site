@@ -59,6 +59,11 @@ export const FLUSH_AT = 20;
 export const MAX_FAILURES = 3;
 /** Limite da fila em memória: o excedente é descartado. */
 export const MAX_QUEUE = 100;
+/**
+ * Maior número de vidas que a ingestão aceita (telemetry/shared/validate.ts, já publicado). O jogo pode passar disso
+ * (vida extra a cada 10 sem errar): o resultado vai com o teto e as mudanças acima dele não são enviadas.
+ */
+export const TELEMETRY_MAX_LIVES = 4;
 
 export class Telemetry {
   readonly url: string;
@@ -129,6 +134,7 @@ export class Telemetry {
   }
 
   result(d: { n: number; mg: string; result: "win" | "lose"; level: number; tier: number; dur: number; used: number; lives: number; input: string }): void {
+    // a ingestão aceita vidas de 0 a TELEMETRY_MAX_LIVES: acima disso vai o teto ("4 ou mais")
     this.push("microgame_result", {
       n: d.n,
       mg: d.mg,
@@ -137,12 +143,14 @@ export class Telemetry {
       tier: d.tier,
       dur: round(d.dur, 2),
       used: round(Math.max(0, Math.min(d.used, d.dur)), 2),
-      lives: d.lives,
+      lives: Math.min(d.lives, TELEMETRY_MAX_LIVES),
       input: d.input,
     });
   }
 
   lifeChanged(d: { n: number; from: number; to: number; reason: "lose" | "milestone" }): void {
+    // mudanças acima do teto aceito pela ingestão (vidas extras por 10 sem errar) não são enviadas
+    if (d.from > TELEMETRY_MAX_LIVES || d.to > TELEMETRY_MAX_LIVES) return;
     this.push("life_changed", d);
   }
 

@@ -1,7 +1,8 @@
 // Cliente de telemetria: lotes grandes, Game Over/abandono imediatos, falhas que nunca quebram o jogo, offline, DNT/GPC.
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { Telemetry, FLUSH_AT, MAX_FAILURES, MAX_QUEUE, type Transport, type WireEvent } from "../src/telemetry/client.ts";
+import { Telemetry, FLUSH_AT, MAX_FAILURES, MAX_QUEUE, TELEMETRY_MAX_LIVES, type Transport, type WireEvent } from "../src/telemetry/client.ts";
+import { parseBatch } from "../../telemetry/shared/validate.ts";
 import { Session } from "../src/core/session.ts";
 import { InputCore } from "../src/core/input.ts";
 import { CATALOG } from "../src/games/index.ts";
@@ -39,6 +40,31 @@ function make(o: { fail?: boolean; online?: boolean; optedOut?: boolean } = {}) 
 const result = (n: number, r: "win" | "lose" = "win") => ({ n, mg: "swat-fly", result: r, level: 0.25, tier: 1, dur: 7, used: 2.345, lives: 4, input: "mouse" });
 
 describe("cliente de telemetria", () => {
+  test("mais de 4 vidas (10 sem errar): o resultado vai com o teto e as mudanças acima dele não saem; a ingestão publicada aceita tudo", () => {
+    const { tele, sent, runTimers } = make();
+    tele.startRun({ lang: "pt", device: "desktop" });
+    tele.result({ ...result(9), lives: 4 });
+    tele.lifeChanged({ n: 10, from: 4, to: 5, reason: "milestone" });
+    tele.result({ ...result(11), lives: 7 });
+    tele.result({ ...result(12, "lose"), lives: 6 });
+    tele.lifeChanged({ n: 12, from: 7, to: 6, reason: "lose" });
+    tele.lifeChanged({ n: 13, from: 5, to: 4, reason: "lose" });
+    tele.lifeChanged({ n: 14, from: 4, to: 3, reason: "lose" });
+    runTimers();
+    const events = sent.flatMap((b) => b.events);
+    assert.deepEqual(
+      events.filter((e) => e.type === "microgame_result").map((e) => (e as unknown as { lives: number }).lives),
+      [4, TELEMETRY_MAX_LIVES, TELEMETRY_MAX_LIVES],
+    );
+    assert.deepEqual(
+      events.filter((e) => e.type === "life_changed").map((e) => (e as unknown as { from: number; to: number }).to),
+      [3],
+      "só a mudança 4 → 3 sai",
+    );
+    const parsed = parseBatch(JSON.stringify({ v: 1, events }));
+    assert.ok(parsed && parsed.rejected === 0, `a ingestão recusaria ${parsed?.rejected} eventos`);
+  });
+
   test("eventos esperam o lote (por tempo ou por quantidade); o game_start vai junto com o primeiro", () => {
     const { tele, sent, runTimers } = make();
     tele.startRun({ lang: "pt", device: "mobile" });
