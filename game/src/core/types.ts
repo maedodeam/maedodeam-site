@@ -29,7 +29,7 @@ export type Category =
 export type Family = "tap" | "action" | "drag" | "hold" | "swipe" | "move" | "choice";
 
 /** Dica de controle mostrada sob o verbo. O texto final depende do aparelho (ver i18n.ts). */
-export type PointerHint = "tap" | "tap-many" | "drag" | "hold" | "swipe" | "move" | "none";
+export type PointerHint = "tap" | "tap-many" | "drag" | "hold" | "swipe" | "move" | "goto" | "none";
 /** Teclas aceitas. Ausente = o microgame não tem versão de teclado (no desktop, usa-se o mouse). */
 export type KeyHint = "space" | "lr" | "ud" | "arrows" | "arrows-space" | "digits" | "type" | "none";
 

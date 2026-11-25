@@ -1,5 +1,6 @@
 // 080 · SLACK OFF! — você está jogando no computador do trabalho: a diversão enche enquanto você NÃO segura.
-// Quando o chefe passa pela janela de vidro (aviso: sombra e passos), SEGURE para abrir a planilha.
+// O chefe vem andando atrás do vidro fosco (aviso: sombra e passos) até o meio da janela; quando chega e olha,
+// SEGURE para abrir a planilha. Depois ele segue andando e sai pelo outro lado.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -7,8 +8,12 @@ import { boss, monitor } from "../../gfx/art.ts";
 import { clamp } from "../../kit/mover.ts";
 
 interface Pass {
-  /** Início do aviso. */
+  /** Início do aviso (o chefe entra na janela). */
   t: number;
+  /** Sentido da caminhada: 1 = da esquerda para a direita. */
+  dir: number;
+  /** Quanto tempo ele leva para sair depois de olhar (antes da próxima passada). */
+  leave: number;
 }
 interface S {
   fun: number;
@@ -20,18 +25,53 @@ interface S {
   holding: boolean;
   caught: boolean;
   phase: "calm" | "warn" | "look";
-  /** Fase do chefe: 0..1 dentro do aviso + olhada (para animar a caminhada). */
-  pk: number;
-  dir: number;
+  /** Relógio do chefe (congela quando a rodada acaba). */
+  bt: number;
   scoreT: number;
 }
 
-function phaseAt(s: S, t: number): { phase: S["phase"]; k: number; since: number } {
+function phaseAt(s: S, t: number): { phase: S["phase"]; since: number } {
   for (const p of s.passes) {
-    if (t >= p.t && t < p.t + s.warn) return { phase: "warn", k: (t - p.t) / (s.warn + s.look), since: t - p.t };
-    if (t >= p.t + s.warn && t < p.t + s.warn + s.look) return { phase: "look", k: (t - p.t) / (s.warn + s.look), since: t - p.t - s.warn };
+    if (t >= p.t && t < p.t + s.warn) return { phase: "warn", since: t - p.t };
+    if (t >= p.t + s.warn && t < p.t + s.warn + s.look) return { phase: "look", since: t - p.t - s.warn };
   }
-  return { phase: "calm", k: 0, since: 0 };
+  return { phase: "calm", since: 0 };
+}
+
+/**
+ * Onde está o chefe no instante t. Caminho contínuo: entra por uma borda da janela, anda até o meio durante todo o
+ * aviso (desacelerando para parar), fica parado olhando e depois segue até sair pela outra borda. Sem saltos.
+ */
+export function bossPos(s: S, t: number, w: number, margin: number): { x: number; mode: "walk" | "look"; walk: number } | null {
+  const cx = w / 2;
+  for (const p of s.passes) {
+    const since = t - p.t;
+    if (since < 0 || since >= s.warn + s.look + p.leave) continue;
+    const from = p.dir > 0 ? 40 - margin : w - 40 + margin;
+    const to = p.dir > 0 ? w - 40 + margin : 40 - margin;
+    if (since < s.warn) {
+      const k = since / s.warn;
+      return { x: from + (cx - from) * k * (1.6 - 0.6 * k), mode: "walk", walk: since * 2.6 };
+    }
+    if (since < s.warn + s.look) return { x: cx, mode: "look", walk: 0 };
+    const k = (since - s.warn - s.look) / p.leave;
+    return { x: cx + (to - cx) * k * (0.4 + 0.6 * k), mode: "walk", walk: since * 2.6 };
+  }
+  return null;
+}
+
+/** Sombra do chefe no vidro fosco: mesma silhueta e posição do desenho do chefe. (x, y) = pés. */
+function shadowOf(g: Gfx, x: number, y: number, sc: number, walk: number): void {
+  const step = Math.sin(walk * Math.PI * 2) * 14;
+  g.push();
+  g.alpha(0.42);
+  g.translate(x, y);
+  g.scale(sc);
+  g.line(-14, -60, -14 - step, 0, C.ink, 20);
+  g.line(14, -60, 14 + step, 0, C.ink, 20);
+  g.rect(-42, -144, 84, 96, C.ink, { r: 24, stroke: null });
+  g.circle(0, -178, 46, C.ink, { stroke: null });
+  g.pop();
 }
 
 function setup(api: MicroAPI): MicroInstance {
@@ -39,7 +79,8 @@ function setup(api: MicroAPI): MicroInstance {
   const lv = Math.min(api.level, 1.5);
   const portrait = h > w;
   const D = api.duration;
-  const warn = 0.35 - lv * 0.1;
+  // Aviso = a caminhada até o meio da janela; precisa dar tempo de ver e reagir mesmo no nível alto.
+  const warn = 0.95 - lv * 0.3;
   const look = 0.75 - lv * 0.15;
   const grace = 0.1;
   const fillTime = clamp(D * 0.5, 1.6, 3.2);
@@ -47,9 +88,13 @@ function setup(api: MicroAPI): MicroInstance {
   const passes: Pass[] = [];
   // O chefe nunca aparece enquanto a instrução ainda está na tela (≥ 0,8 s de jogo).
   let t = rng.range(0.8, Math.max(0.85, fillTime - warn - grace - 0.1));
+  let dir = rng.sign();
   for (let i = 0; i < nPass; i++) {
-    passes.push({ t });
-    t += warn + look + rng.range(0.3, 0.8);
+    const gap = rng.range(0.3, 0.8);
+    // Ele sai pelo outro lado antes da próxima passada (que volta no sentido contrário).
+    passes.push({ t, dir, leave: Math.min(warn, gap - 0.05) });
+    dir = -dir;
+    t += warn + look + gap;
   }
   const s: S = {
     fun: 0,
@@ -61,8 +106,7 @@ function setup(api: MicroAPI): MicroInstance {
     holding: false,
     caught: false,
     phase: "calm",
-    pk: 0,
-    dir: rng.sign(),
+    bt: 0,
     scoreT: 0,
   };
 
@@ -72,7 +116,7 @@ function setup(api: MicroAPI): MicroInstance {
       const ph = phaseAt(s, api.time);
       if (!api.result) {
         s.phase = ph.phase;
-        s.pk = ph.k;
+        s.bt = api.time;
       }
       if (api.result) return;
       const hold = api.input.action;
@@ -105,33 +149,22 @@ function setup(api: MicroAPI): MicroInstance {
       g.rect(40, wy, w - 80, wh, "#cfeefa", { lw: 8 });
       for (let x = 40 + (w - 80) / 3; x < w - 60; x += (w - 80) / 3) g.line(x, wy, x, wy + wh, C.ink, 7);
       // chefe passando
-      const span = w + 400;
-      const walkX = (k: number) => (s.dir > 0 ? -200 + span * k : w + 200 - span * k);
-      if (s.phase !== "calm" || s.caught) {
-        const k = s.pk;
-        // no aviso: entra até perto do centro; na olhada: para no meio
-        const bx = s.phase === "warn" ? walkX(0.15 + k * 0.6) : s.caught ? w / 2 : walkX(0.5);
-        const bossScale = wh / 300;
-        const by = wy + wh + 30 * bossScale;
+      const bossScale = wh / 300;
+      const by = wy + wh + 30 * bossScale;
+      const bp = s.caught ? { x: w / 2, mode: "look" as const, walk: 0 } : bossPos(s, s.bt, w, 90 * bossScale);
+      if (bp) {
+        const bx = bp.x;
         g.push();
         g.clip(40, wy, w - 80, wh);
-        if (s.phase === "warn") {
-          // sombra no vidro fosco
-          g.push();
-          g.alpha(0.35);
-          g.ellipse(bx, by - 190 * bossScale, 60 * bossScale, 60 * bossScale, C.ink, { stroke: null });
-          g.rect(bx - 50 * bossScale, by - 150 * bossScale, 100 * bossScale, 150 * bossScale, C.ink, { stroke: null, r: 30 });
-          g.pop();
-        } else {
-          boss(g, bx, by, bossScale, { mood: s.caught ? "angry" : "neutral", look: { x: 0, y: 0.6 }, walk: undefined });
-        }
+        if (bp.mode === "walk") shadowOf(g, bx, by, bossScale, bp.walk);
+        else boss(g, bx, by, bossScale, { mood: s.caught ? "angry" : "neutral", look: { x: 0, y: 0.6 } });
         g.pop();
-        if (s.phase === "warn") {
+        if (s.phase === "warn" && !s.caught) {
           for (let i = 0; i < 2; i++) {
-            const fx = bx + (i - 0.5) * 120;
+            const fx = Math.max(90, Math.min(w - 90, bx)) + (i - 0.5) * 120;
             g.text(api.t({ en: "tok", pt: "toc" }), fx, wy + wh + 50 + (i % 2) * 20, { size: 46, color: C.ink, font: "body", weight: 800 });
           }
-          g.text("!", bx, wy + 70, { size: 110, color: C.red, stroke: C.ink, lw: 12 });
+          g.text("!", Math.max(110, Math.min(w - 110, bx)), wy + 70, { size: 110, color: C.red, stroke: C.ink, lw: 12 });
         }
       }
       // reflexo do vidro
@@ -211,7 +244,7 @@ export const slackOff: Entry<S> = {
     goal: "complete",
     difficulty: 2,
     mechanic:
-      "You are playing a game at work: the fun meter fills while you are NOT holding. The boss walks past the glass wall now and then (warning: a shadow and footsteps first). While he looks, hold to show the spreadsheet.",
+      "You are playing a game at work: the fun meter fills while you are NOT holding. Now and then the boss's shadow walks along the frosted glass wall (with footsteps) up to the middle, where he stops and looks in. While he looks, hold to show the spreadsheet; then he walks off the other side.",
     winText: "Fill the fun meter without getting caught.",
     loseText: "The boss sees the game, or time runs out.",
     timeScale: 1.4,

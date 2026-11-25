@@ -89,7 +89,7 @@ export const SKILL_WEIGHTS: Record<string, SkillWeights> = {
   "pipe-flow": { lo: 9, pe: 5 },
   "key-match": { pe: 10 },
   "mini-maze": { lo: 7, co: 7 },
-  "lights-out": { lo: 10 },
+  "lights-out": { pe: 7, pr: 6, co: 3 }, // agora: achar as acesas e tocar uma a uma, rápido (era o puzzle de vizinhas)
   "binary-bits": { lo: 10 },
   "flow-link": { lo: 9, co: 4 },
   "sock-pair": { pe: 10, me: 3 },

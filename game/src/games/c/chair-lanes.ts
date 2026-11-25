@@ -2,7 +2,6 @@
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
-import { sideTap } from "../../kit/mover.ts";
 import { mem } from "../../testing/botkit.ts";
 import { prog, mix } from "./util.ts";
 
@@ -32,7 +31,12 @@ interface S {
   crashed: boolean;
   scroll: number;
   clock: number;
+  /** Gesto do ponteiro em curso: 0 = nenhum, 1 = acompanhando, 2 = já virou troca de faixa. */
+  gest: 0 | 1 | 2;
 }
+
+/** Arrasto horizontal mínimo (unidades do palco) para contar como deslizar. Bem abaixo do SWIPE_MIN global. */
+const SWIPE = 36;
 
 function setup(api: MicroAPI): MicroInstance {
   const { w, h, rng } = api;
@@ -59,6 +63,7 @@ function setup(api: MicroAPI): MicroInstance {
     crashed: false,
     scroll: 0,
     clock: 0,
+    gest: 0,
   };
   s.px = s.x0 + (s.lane + 0.5) * laneW;
   // Fileiras pré-sorteadas. Uma faixa livre "garantida" anda no máximo uma faixa por fileira.
@@ -89,7 +94,27 @@ function setup(api: MicroAPI): MicroInstance {
       s.clock += dt;
       const inp = api.input;
       if (!s.crashed && !api.result) {
-        const d = sideTap(inp, w, h, "x");
+        // Troca de faixa tolerante. Antes (sideTap), o toque só valia se o dedo andasse < 40 e o deslizar
+        // só valia com >= 90 em até 0,75 s: no meio disso nada acontecia, e o lado era o meio do palco
+        // (com 4 faixas, a cadeira quase nunca está no meio). Agora:
+        // - deslizar curto (>= SWIPE na horizontal) troca na hora, sem esperar soltar;
+        // - qualquer outro toque/clique troca ao soltar, para o lado em que encostou em relação à cadeira;
+        // - setas continuam valendo.
+        let d = 0;
+        if (inp.keyPressed("left")) d = -1;
+        else if (inp.keyPressed("right")) d = 1;
+        if (inp.pressed) s.gest = 1;
+        if (s.gest === 1 && (inp.down || inp.released)) {
+          const dx = inp.x - inp.startX;
+          if (Math.abs(dx) >= SWIPE && Math.abs(dx) >= Math.abs(inp.y - inp.startY) * 0.8) {
+            d = dx < 0 ? -1 : 1;
+            s.gest = 2;
+          }
+        }
+        if (inp.released) {
+          if (s.gest === 1) d = inp.startX < s.px ? -1 : 1;
+          s.gest = 0;
+        }
         if (d !== 0) {
           const nl = Math.max(0, Math.min(s.lanes - 1, s.lane + d));
           if (nl !== s.lane) {
@@ -222,18 +247,23 @@ function setup(api: MicroAPI): MicroInstance {
   };
 }
 
+/** Ponto de toque dos bots: um pouco ao lado da cadeira, na direção pedida. */
+function sideX(s: S, w: number, d: number): number {
+  return Math.max(10, Math.min(w - 10, s.px + d * s.laneW * 0.8));
+}
+
 export const chairLanes: Entry<S> = {
   def: {
     id: "chair-lanes",
     num: 49,
     name: { en: "Office Chair Race", pt: "Corrida de Cadeira" },
     verb: { en: "SWERVE!", pt: "ESQUIVA!" },
-    hint: { pointer: "swipe", keys: "lr" },
+    hint: { pointer: "tap", keys: "lr" },
     category: "dodge",
     family: "swipe",
     goal: "survive",
     difficulty: 2,
-    mechanic: "Rolling down the hallway on an office chair (top view). Plants, coworkers, cones and boxes come down 3 (later 4) lanes. Swipe, tap a side of the screen or press left/right to change lanes. There is always a free lane within reach.",
+    mechanic: "Rolling down the hallway on an office chair (top view). Plants, coworkers, cones and boxes come down 3 (later 4) lanes. Tap or click anywhere left or right of the chair (or make a short swipe, or press left/right) to move one lane that way. There is always a free lane within reach.",
     winText: "Roll until time runs out without hitting anything.",
     loseText: "Crash into an obstacle.",
     minTime: 3,
@@ -279,18 +309,28 @@ export const chairLanes: Entry<S> = {
             const nl = s.lane + Math.sign(want - s.lane);
             const busy = s.obs.some((o) => o.lane === nl && Math.abs(o.y - s.py) < s.oh + s.ph + s.speed * 0.06);
             if (!busy) {
-              io.tap(want < s.lane ? api.w * 0.2 : api.w * 0.8, api.h * 0.5);
+              io.tap(sideX(s, api.w, want < s.lane ? -1 : 1), api.h * 0.5);
               m.cool = 0.07;
             }
           }
         },
         lose(s, api, io, dt) {
           if (api.result) return;
-          const m = mem(s, () => ({ cool: 0 }));
+          const m = mem(s, () => ({ cool: 0, lift: false }));
           m.cool -= dt;
           const next = s.obs.filter((o) => o.y < s.py).sort((a, b) => b.y - a.y)[0];
+          if (m.lift) {
+            io.up(io.px, io.py);
+            m.lift = false;
+          }
           if (next && next.lane !== s.lane && m.cool <= 0) {
-            io.tap(next.lane < s.lane ? api.w * 0.2 : api.w * 0.8, api.h * 0.5);
+            const d = next.lane < s.lane ? -1 : 1;
+            if (io.touch) {
+              // deslizar curto (abaixo do antigo limite de 90) começando em cima da cadeira
+              io.down(s.px, s.py);
+              io.move(s.px + d * 50, s.py + 8);
+              m.lift = true;
+            } else io.tap(sideX(s, api.w, d), api.h * 0.5);
             m.cool = 0.08;
           }
         },
