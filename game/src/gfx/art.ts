@@ -17,6 +17,8 @@ export interface PersonOpts {
   glasses?: boolean;
   /** Fase da caminhada (0..1), anima as pernas. */
   walk?: number;
+  /** Chute: a perna desse lado (-1 esquerda, 1 direita) sobe para a frente, em vez de ficar no chão. */
+  kick?: -1 | 1;
 }
 
 /** Pessoa de escritório (corpo + cabeça). Altura total ≈ 230·s; (x, y) = pés. */
@@ -27,8 +29,16 @@ export function person(g: Gfx, x: number, y: number, s = 1, o: PersonOpts = {}):
   if (o.tilt) g.rotate(o.tilt);
   const step = o.walk === undefined ? 0 : Math.sin(o.walk * Math.PI * 2) * 14;
   // pernas
-  g.line(-14, -60, -14 - step, 0, C.ink, 16);
-  g.line(14, -60, 14 + step, 0, C.ink, 16);
+  if (o.kick) {
+    // a perna de apoio fica sob o corpo; a outra sai de baixo da camisa e sobe para o lado do chute, com o sapato
+    const k = o.kick;
+    g.line(-14 * k, -60, -6 * k, 0, C.ink, 16);
+    g.line(14 * k, -60, 56 * k, -94, C.ink, 16);
+    g.ellipse(62 * k, -100, 22, 13, C.ink2, { rot: -0.7 * k });
+  } else {
+    g.line(-14, -60, -14 - step, 0, C.ink, 16);
+    g.line(14, -60, 14 + step, 0, C.ink, 16);
+  }
   // corpo
   g.rect(-38, -140, 76, 88, o.shirt ?? C.paper, { r: 22 });
   if (o.tie !== null) {
