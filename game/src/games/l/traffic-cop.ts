@@ -170,11 +170,6 @@ function setup(api: MicroAPI): MicroInstance {
       g.rect(cx - RW / 2 + 4, cy - RW / 2 + 4, RW - 8, RW - 8, C.gray2, { stroke: null });
       for (let x = 0; x < w; x += 120) if (Math.abs(x + 30 - cx) > RW / 2 + 40) g.line(x, cy, x + 60, cy, C.yellow, 6);
       for (let y = 0; y < h; y += 120) if (Math.abs(y + 30 - cy) > RW / 2 + 40) g.line(cx, y, cx, y + 60, C.yellow, 6);
-      // faixas de pare
-      g.line(cx, cy + RW / 2 + 16, cx + RW / 2, cy + RW / 2 + 16, C.white, 12);
-      g.line(cx - RW / 2, cy - RW / 2 - 16, cx, cy - RW / 2 - 16, C.white, 12);
-      g.line(cx - RW / 2 - 16, cy, cx - RW / 2 - 16, cy + RW / 2, C.white, 12);
-      g.line(cx + RW / 2 + 16, cy - RW / 2, cx + RW / 2 + 16, cy, C.white, 12);
       // carros (só o atual e os que estão indo embora)
       for (let i = 0; i < s.cars.length; i++) {
         const c = s.cars[i];
@@ -219,9 +214,13 @@ function setup(api: MicroAPI): MicroInstance {
       g.circle(gx, gy - 10, 70, C.white, { lw: 6 });
       person(g, gx, gy + 40, 0.9, { shirt: C.blue, tie: null, hat: C.ink2, mood: api.result === "lose" ? "shock" : "neutral" });
       if (s.waved && s.waveT < 0.4) {
+        // o braço sai do ombro (do lado do aceno; para cima/baixo, o direito), não da cabeça
         const v = dirVec(s.waved);
-        g.line(gx, gy - 100, gx + v.x * 120, gy - 100 + v.y * 120, C.blue, 18);
-        g.circle(gx + v.x * 120, gy - 100 + v.y * 120, 26, C.white, { lw: 6 });
+        const sx = gx + (v.x < 0 ? -30 : 30);
+        const sy = gy - 72;
+        g.line(sx, sy, sx + v.x * 120, sy + v.y * 120, C.ink, 26);
+        g.line(sx, sy, sx + v.x * 120, sy + v.y * 120, C.blue, 16);
+        g.circle(sx + v.x * 120, sy + v.y * 120, 26, C.white, { lw: 6 });
       }
       // progresso
       for (let i = 0; i < s.need; i++) {

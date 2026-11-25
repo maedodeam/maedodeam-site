@@ -147,7 +147,7 @@ export class MicroRunner {
     this.resultClock = this.clock;
     this.remainingAtResult = Math.max(0, this.duration - this.time);
     this.phase = "after";
-    this.afterLeft = AFTERMATH;
+    this.afterLeft = this.def.aftermath ?? AFTERMATH;
   }
 
   /** Avança dt segundos. A entrada já deve ter sido fechada para este quadro (InputCore.frame). */

@@ -1,5 +1,6 @@
-// 108 · BUILD IT! — a comanda mostra um lanche de 4 a 6 camadas (de baixo para cima). Toque nos ingredientes na ordem
-// de montagem, começando pelo pão de baixo (ou aperte 1–6). Ingrediente errado = derrota.
+// 108 · BUILD IT! — a comanda mostra um lanche de 4 a 6 camadas. O pão vem primeiro e por último; o recheio entra em
+// qualquer ordem (toque ou aperte 1–6). Errado = um ingrediente que não está na comanda (ou que já foi todo), ou o pão
+// de cima antes de terminar o recheio.
 // Nos níveis altos (≥ 0,6) a comanda vira de costas depois de ~1 s: é preciso decorar.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
@@ -20,6 +21,8 @@ const NAMES = [
 interface S {
   order: Ing[];
   built: Ing[];
+  /** Para cada camada da comanda: já foi posta no lanche? (marca na comanda) */
+  done: boolean[];
   btns: Btn[];
   hideAt: number;
   flip: number;
@@ -67,6 +70,26 @@ function layer(g: Gfx, ing: Ing, x: number, y: number, w: number, top: boolean):
   }
 }
 
+/**
+ * Onde a camada escolhida entra na comanda, ou -1 se for erro. O pão de baixo vem primeiro e o de cima por último; o
+ * recheio vale em qualquer ordem, desde que esteja na comanda e ainda falte.
+ */
+function matchSlot(s: S, ing: Ing): number {
+  const n = s.order.length;
+  if (!s.done[0]) return ing === 0 ? 0 : -1;
+  const fillLeft = s.done.slice(1, n - 1).some((d) => !d);
+  if (!fillLeft) return ing === 0 ? n - 1 : -1;
+  if (ing === 0) return -1;
+  for (let k = 1; k < n - 1; k++) if (!s.done[k] && s.order[k] === ing) return k;
+  return -1;
+}
+
+/** Uma camada que ainda pode entrar agora (para os bots). */
+function anyValid(s: S): Ing {
+  for (let i = 0; i < 6; i++) if (matchSlot(s, i as Ing) >= 0) return i as Ing;
+  return 0;
+}
+
 function setup(api: MicroAPI): MicroInstance {
   const { w, h, rng } = api;
   const lv = Math.min(api.level, 1.5);
@@ -105,6 +128,7 @@ function setup(api: MicroAPI): MicroInstance {
   const s: S = {
     order,
     built: [],
+    done: order.map(() => false),
     btns,
     hideAt: lv >= 0.6 ? 1.0 + 0.1 * layers : Infinity,
     flip: 0,
@@ -132,9 +156,9 @@ function setup(api: MicroAPI): MicroInstance {
       if (i < 0) return;
       s.lit = i;
       s.litT = 0;
-      const want = s.order[s.built.length];
+      const slot = matchSlot(s, i as Ing);
       s.built.push(i as Ing);
-      if (i !== want) {
+      if (slot < 0) {
         s.wrong = i;
         api.sfx("buzz");
         api.fx.shake(0.5);
@@ -142,6 +166,7 @@ function setup(api: MicroAPI): MicroInstance {
         api.lose();
         return;
       }
+      s.done[slot] = true;
       api.sfx("pop");
       if (s.built.length >= s.order.length) {
         api.sfx("chime");
@@ -171,8 +196,16 @@ function setup(api: MicroAPI): MicroInstance {
         const step = Math.min(56, (tk.h - 170) / n);
         const y0 = tk.h / 2 - 50;
         for (let i = 0; i < n; i++) layer(g, s.order[i], -tk.w * 0.08, y0 - i * step, lw, i === n - 1);
-        // números da ordem
-        for (let i = 0; i < n; i++) g.text(String(i + 1), tk.w / 2 - 34, y0 - i * step, { size: 30, font: "mono", color: C.gray2 });
+        // camadas já postas ganham um ✓
+        for (let i = 0; i < n; i++) {
+          if (!s.done[i]) continue;
+          const cx = tk.w / 2 - 34;
+          const cy = y0 - i * step;
+          for (const [col, lw] of [[C.ink, 12], [C.green, 6]] as const) {
+            g.line(cx - 14, cy, cx - 4, cy + 11, col, lw);
+            g.line(cx - 4, cy + 11, cx + 16, cy - 13, col, lw);
+          }
+        }
       }
       g.pop();
       // o lanche sendo montado no prato
@@ -214,9 +247,9 @@ export const burgerOrder: Entry<S> = {
     goal: "complete",
     difficulty: 1,
     mechanic:
-      "An order ticket shows a burger of 4 to 6 layers, bottom to top. Tap the ingredient buttons (or keys 1-6) in stacking order, starting with the bottom bun. Later (level 0.6+) the ticket flips face-down after about a second, so you must remember it.",
-    winText: "Stack every layer in the right order.",
-    loseText: "Add a wrong ingredient, or time runs out.",
+      "An order ticket shows a burger of 4 to 6 layers. Tap the ingredient buttons (or keys 1-6): bun first, then the fillings in any order, then the top bun. Each ingredient on the ticket gets a check mark. Later (level 0.6+) the ticket flips face-down after about a second, so you must remember it.",
+    winText: "Stack every layer on the ticket, buns first and last.",
+    loseText: "Add something that isn't on the ticket (or one too many), close the bun too early, or time runs out.",
     timeScale: 1.5,
     minTime: 4.5,
     bg: BG.orange,
@@ -228,17 +261,17 @@ export const burgerOrder: Entry<S> = {
           if (api.result || api.time < 0.2) return;
           const m = mem(s, () => ({ next: 0 }));
           if (api.time < m.next || io.isDown) return;
-          const c = btnCenter(s.btns[s.order[s.built.length]]);
+          const c = btnCenter(s.btns[anyValid(s)]);
           io.tap(c.x, c.y);
           m.next = api.time + 0.15;
         },
         lose(s, api, io) {
-          // acerta o pão e depois erra a segunda camada
+          // acerta o pão e depois põe um ingrediente que não está na comanda
           if (api.result || api.time < 0.2) return;
           const m = mem(s, () => ({ next: 0 }));
           if (api.time < m.next || io.isDown) return;
-          const want = s.order[s.built.length];
-          const pick = s.built.length === 0 ? want : (((want % 5) + 1) as Ing);
+          const missing = ([1, 2, 3, 4, 5] as Ing[]).find((x) => !s.order.includes(x)) ?? 0;
+          const pick = s.built.length === 0 ? 0 : missing;
           io.press(`Digit${pick + 1}`);
           m.next = api.time + 0.15;
         },

@@ -1,5 +1,6 @@
 // 165 · DROP IT! — uma rosquinha balança numa corda acima de um colega de boca aberta (fora do centro).
 // Deslize atravessando a corda para cortar: a rosquinha sai pela tangente e cai. Tem que cair dentro da boca.
+// Errou? A rosquinha se esborracha no chão e outra aparece na corda: dá para tentar de novo até o tempo acabar.
 // Nível 0 mostra a trajetória prevista; depois ela some, o balanço acelera e (lv ≥ 1) o colega se mexe.
 import type { Entry, MicroAPI, MicroInstance, Point } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
@@ -31,6 +32,10 @@ interface S {
   eaten: boolean;
   missed: boolean;
   bounce: number;
+  /** Rosquinhas que já caíram no chão (x), para ficarem lá esborrachadas. */
+  splats: number[];
+  /** Quando a rosquinha nova apareceu na corda (para o "pop" de entrada). */
+  spawnT: number;
   t: number;
   endT: number;
   cutAt: Point | null;
@@ -61,6 +66,9 @@ function landing(s: S, t: number): { x: number; t: number } {
   const tf = (-v.y + Math.sqrt(Math.max(0, v.y * v.y + 2 * s.G * dy))) / s.G;
   return { x: p.x + v.x * tf, t: t + tf };
 }
+
+/** Segundos entre a rosquinha cair no chão e a próxima aparecer na corda. */
+const RETRY_AFTER = 0.7;
 
 function drawDonut(g: Gfx, x: number, y: number, r: number, rot: number): void {
   g.push();
@@ -108,6 +116,8 @@ function setup(api: MicroAPI): MicroInstance {
     eaten: false,
     missed: false,
     bounce: 0,
+    splats: [],
+    spawnT: -9,
     t: 0,
     endT: 0,
     cutAt: null,
@@ -154,9 +164,20 @@ function setup(api: MicroAPI): MicroInstance {
       const e = s.t - s.rt;
       if (s.eaten) return;
       if (s.missed) {
-        // quica no chão
+        // quica no chão e, depois de um instante, vem outra rosquinha na corda
         s.donut.x += s.v0.x * 0.4 * dt;
         s.bounce += dt;
+        if (s.bounce >= RETRY_AFTER && !api.result) {
+          s.splats.push(s.donut.x);
+          if (s.splats.length > 6) s.splats.shift();
+          s.cut = false;
+          s.missed = false;
+          s.bounce = 0;
+          s.cutAt = null;
+          s.spawnT = s.t;
+          s.donut = swingState(s, s.t).p;
+          api.sfx("pop");
+        }
         return;
       }
       const x = s.r0.x + s.v0.x * e;
@@ -172,11 +193,11 @@ function setup(api: MicroAPI): MicroInstance {
           api.fx.burst(mx, s.my, C.pink, 22);
           api.win();
         } else {
+          // errou: não perde ainda, tenta de novo com outra rosquinha (perde só quando o tempo acabar)
           s.missed = true;
           s.donut = { x: lx, y: s.my };
           api.sfx("thud");
           api.fx.shake(0.3);
-          api.lose();
         }
         return;
       }
@@ -199,6 +220,11 @@ function setup(api: MicroAPI): MicroInstance {
           const e = (tf * i) / 10;
           g.circle(st.p.x + st.v.x * e, st.p.y + st.v.y * e + 0.5 * s.G * e * e, 9, ok ? C.green : C.white, { lw: 4 });
         }
+      }
+      // rosquinhas que já caíram, esborrachadas no chão
+      for (const x of s.splats) {
+        g.ellipse(x, floorY - 18, 62, 22, C.brown2, { lw: 5 });
+        g.ellipse(x, floorY - 22, 48, 14, C.pink, { stroke: null });
       }
       // colega de boca aberta
       const mx = s.eaten ? s.donut.x : mouthX(s, s.t);
@@ -232,12 +258,14 @@ function setup(api: MicroAPI): MicroInstance {
         const rot = s.cut ? (s.t - s.rt) * 8 : theta(s, s.t);
         const dy = s.missed ? -Math.abs(Math.sin(s.bounce * 12)) * 60 * Math.max(0, 1 - s.bounce * 2) : 0;
         const y = s.missed ? floorY - 50 + dy : s.donut.y;
-        drawDonut(g, s.donut.x, y, 52, rot);
+        const pop = s.cut ? 1 : Math.min(1, (s.t - s.spawnT) / 0.18);
+        drawDonut(g, s.donut.x, y, 52 * pop, rot);
       }
       // rastro do dedo
       const inp = api.input;
       if (inp.down && inp.trail.length > 1) g.polyline(inp.trail, C.white, 10);
-      if (api.result === "lose") g.text(api.t({ en: "SPLAT!", pt: "PLOFT!" }), w / 2, portrait ? h * 0.4 : h * 0.3, { size: 100, color: C.pink, stroke: C.ink, lw: 12 });
+      if (s.missed && !api.result) g.text(api.t({ en: "SPLAT! AGAIN!", pt: "PLOFT! DE NOVO!" }), w / 2, portrait ? h * 0.4 : h * 0.3, { size: 90, color: C.pink, stroke: C.ink, lw: 12 });
+      else if (api.result === "lose") g.text(api.t({ en: "SPLAT!", pt: "PLOFT!" }), w / 2, portrait ? h * 0.4 : h * 0.3, { size: 100, color: C.pink, stroke: C.ink, lw: 12 });
     },
   };
 }
@@ -254,9 +282,9 @@ export const cutRope: Entry<S> = {
     goal: "complete",
     difficulty: 2,
     mechanic:
-      "A donut swings on a rope above a coworker with an open mouth, off to one side. Swipe across the rope to cut it; the donut flies off along the swing and falls. Low levels show the predicted path; later the swing is faster and the coworker sways.",
+      "A donut swings on a rope above a coworker with an open mouth, off to one side. Swipe across the rope to cut it; the donut flies off along the swing and falls. A miss splats on the floor and a new donut appears on the rope, so you can keep trying until time runs out. Low levels show the predicted path; later the swing is faster and the coworker sways.",
     winText: "The donut drops right into the open mouth.",
-    loseText: "The donut lands on the floor, or time runs out.",
+    loseText: "Time runs out before a donut lands in the mouth.",
     timeScale: 1.4,
     minTime: 3.8,
     bg: BG.cream,
