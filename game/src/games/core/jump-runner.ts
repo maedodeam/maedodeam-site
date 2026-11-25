@@ -92,10 +92,13 @@ function setup(api: MicroAPI): MicroInstance {
       g.clear(BG.sky);
       // céu de fim de tarde e prédios em parallax
       g.rect(-10, s.ground * 0.55, w + 20, s.ground * 0.5, C.orange2, { stroke: null });
-      const off = (s.scroll * 0.3) % 260;
+      // cada prédio guarda a própria altura (índice no "mundo", não na tela), senão a fileira toda muda a cada volta
+      const par = s.scroll * 0.3;
+      const first = Math.floor(par / 260);
+      const off = par - first * 260;
       for (let i = -1; i < w / 260 + 2; i++) {
         const bx = i * 260 - off;
-        const bh = 180 + ((i * 97) % 5) * 60;
+        const bh = 180 + ((((i + first) * 97) % 5) + 5) % 5 * 60;
         g.rect(bx, s.ground - bh, 200, bh, C.purple, { lw: 6 });
         for (let wy = s.ground - bh + 30; wy < s.ground - 40; wy += 60) {
           g.rect(bx + 30, wy, 40, 30, C.yellow2, { lw: 4 });
