@@ -17,6 +17,7 @@ const POINTER: Record<PointerHint, string> = {
   hold: "hold",
   swipe: "swipe",
   move: "move (mouse follows, touch drags)",
+  goto: "click where to go (touch drags)",
   none: "hands off",
 };
 const KEYS: Record<KeyHint, string> = {

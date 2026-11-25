@@ -1,5 +1,5 @@
 // 053 · SNEAK! — corredor com barreiras de laser que ligam e desligam (piscam antes de ligar). Chegue à saída sem encostar.
-import type { Entry, MicroAPI, MicroInstance, Point } from "../../core/types.ts";
+import type { BotIO, Entry, MicroAPI, MicroInstance, Point } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
 import { person } from "../../gfx/art.ts";
@@ -112,27 +112,38 @@ function setup(api: MicroAPI): MicroInstance {
     update(dt) {
       s.clock += dt;
       if (s.zapped) return;
-      if (!api.result) s.t += dt;
-      // alvo pelo steer (mouse: segue o cursor; toque: relativo; setas)
-      const gp = toScreen(s.gu);
-      const lo = toScreen(0);
-      const hi = toScreen(s.len + 60);
-      steer(
-        api.input,
-        gp,
-        {
-          axis: s.vertical ? "y" : "x",
-          keySpeed: SPEED,
-          maxSpeed: 100000,
-          minX: Math.min(lo.x, hi.x),
-          maxX: Math.max(lo.x, hi.x),
-          minY: Math.min(lo.y, hi.y),
-          maxY: Math.max(lo.y, hi.y),
-        },
-        dt,
-      );
-      s.gu = s.vertical ? s.oy - gp.y : gp.x - s.ox;
       if (api.result) return;
+      s.t += dt;
+      // alvo do jogador:
+      // - setas/WASD: anda direto e para assim que soltar (qualquer seta serve nos dois sentidos do corredor);
+      // - mouse: clicar (ou segurar o clique) marca o destino; só passar o mouse por cima não faz nada;
+      // - toque: o alvo anda junto com o dedo (movimento relativo), como sempre foi.
+      const inp = api.input;
+      const maxU = s.len + 60;
+      const kd = s.vertical ? (inp.axisY !== 0 ? -inp.axisY : inp.axisX) : inp.axisX !== 0 ? inp.axisX : -inp.axisY;
+      if (kd !== 0) {
+        s.gu = Math.max(0, Math.min(maxU, s.u + kd * SPEED * dt));
+      } else if (inp.mode === "touch") {
+        const gp = toScreen(s.gu);
+        const lo = toScreen(0);
+        const hi = toScreen(maxU);
+        steer(
+          inp,
+          gp,
+          {
+            axis: s.vertical ? "y" : "x",
+            keySpeed: SPEED,
+            minX: Math.min(lo.x, hi.x),
+            maxX: Math.max(lo.x, hi.x),
+            minY: Math.min(lo.y, hi.y),
+            maxY: Math.max(lo.y, hi.y),
+          },
+          dt,
+        );
+        s.gu = s.vertical ? s.oy - gp.y : gp.x - s.ox;
+      } else if (inp.mode === "mouse" && inp.down) {
+        s.gu = Math.max(0, Math.min(maxU, s.vertical ? s.oy - inp.y : inp.x - s.ox));
+      }
       const d = s.gu - s.u;
       const step = Math.min(Math.abs(d), SPEED * dt);
       s.u += Math.sign(d) * step;
@@ -234,13 +245,40 @@ function setup(api: MicroAPI): MicroInstance {
         });
       }
       if (s.zapped) g.text("ZZT!", pq.x, pq.y - 200, { size: 70, color: C.yellow, stroke: C.ink, lw: 12 });
-      // alvo do toque (fantasma)
-      if (api.input.mode === "touch" && !api.result && Math.abs(s.gu - s.u) > 30) {
+      // destino marcado (dedo ou clique), como um fantasma no chão
+      if (api.input.mode !== "keys" && !api.result && Math.abs(s.gu - s.u) > 30) {
         const gq = toScreen(s.gu);
         g.circle(gq.x, gq.y, 26, null, { stroke: C.paper, lw: 5 });
+        if (api.input.mode === "mouse") {
+          g.line(gq.x - 12, gq.y - 12, gq.x + 12, gq.y + 12, C.paper, 5);
+          g.line(gq.x - 12, gq.y + 12, gq.x + 12, gq.y - 12, C.paper, 5);
+        }
+      }
+      // no computador, lembra como andar: clique no destino ou setas (o toque já é natural)
+      if (api.input.mode !== "touch" && !api.result) {
+        const txt = api.t({ en: "CLICK WHERE TO GO  ·  OR ARROW KEYS", pt: "CLIQUE ONDE QUER IR  ·  OU SETAS" });
+        const size = Math.min(34, w * 0.034);
+        const tw = Math.min(w - 40, g.textWidth(txt, { size, font: "mono", weight: 700 }) + size * 1.4);
+        const cy = v ? h - 52 : Math.min(h - 60, s.oy + half + 70);
+        g.rect(w / 2 - tw / 2, cy - size * 0.85, tw, size * 1.7, C.ink, { r: size * 0.85, stroke: C.paper, lw: 3 });
+        g.text(txt, w / 2, cy, { size, font: "mono", weight: 700, color: C.paper, maxWidth: tw - size });
       }
     },
   };
+}
+
+/** Bot: leva o destino para u. Toque = arrasto relativo; mouse = clique segurado sobre o destino. */
+function goTo(s: S, io: BotIO, u: number, dt: number): void {
+  const pt = (k: number) => (s.vertical ? { x: s.ox, y: s.oy - k } : { x: s.ox + k, y: s.oy });
+  if (io.touch) {
+    steerTo(io, pt(s.gu), pt(u), 4000, dt);
+    return;
+  }
+  const q = pt(u);
+  if (!io.isDown) {
+    io.move(q.x, q.y);
+    io.down(q.x, q.y);
+  } else io.move(q.x, q.y);
 }
 
 export const laserGrid: Entry<S> = {
@@ -249,12 +287,13 @@ export const laserGrid: Entry<S> = {
     num: 53,
     name: { en: "Laser Hallway", pt: "Corredor de Laser" },
     verb: { en: "SNEAK!", pt: "PASSA!" },
-    hint: { pointer: "move", keys: "lr" },
+    // mouse: clique onde quer ir (o personagem não segue o cursor); toque: arraste; teclado: setas
+    hint: { pointer: "goto", keys: "arrows" },
     category: "dodge",
     family: "move",
     goal: "complete",
     difficulty: 3,
-    mechanic: "A hallway with 3 to 5 laser barriers that switch on and off on their own cycles (they blink right before switching on). Walk to the exit (left to right; bottom to top in portrait) without touching a live laser. Your walking speed is limited, so timing matters.",
+    mechanic: "A hallway with 3 to 5 laser barriers that switch on and off on their own cycles (they blink right before switching on). Walk to the exit (left to right; bottom to top in portrait) without touching a live laser. Mouse: click (or hold the click) where you want to go and the character walks there and stops; hovering does nothing. Arrow keys or WASD walk directly; on touch, drag anywhere. Your walking speed is limited, so timing matters.",
     winText: "Reach the exit.",
     loseText: "Touch a live laser, or time runs out.",
     timeScale: 1.5,
@@ -277,15 +316,13 @@ export const laserGrid: Entry<S> = {
             if (!clearFrom(l, tArrive, cross)) target = start - 4;
             break;
           }
-          const pt = (u: number) => (s.vertical ? { x: s.ox, y: s.oy - u } : { x: s.ox + u, y: s.oy });
-          // o alvo anda só um pouco à frente do jogador (como um dedo cuidadoso)
-          steerTo(io, pt(s.gu), pt(Math.min(target, s.u + 30)), 4000, dt);
+          // o alvo anda só um pouco à frente do jogador (como um dedo cuidadoso, ou um clique segurado)
+          goTo(s, io, Math.min(target, s.u + 30), dt);
         },
         lose(s, api, io, dt) {
           if (api.result) return;
-          const pt = (u: number) => (s.vertical ? { x: s.ox, y: s.oy - u } : { x: s.ox + u, y: s.oy });
           // vai até o primeiro laser e fica parado nele
-          steerTo(io, pt(s.gu), pt(s.lasers[0].u), 4000, dt);
+          goTo(s, io, s.lasers[0].u, dt);
         },
       }
     : null,

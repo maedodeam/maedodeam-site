@@ -1,4 +1,4 @@
-// 023 · INK COLOR! — efeito Stroop: o nome de uma cor pintado com OUTRA cor. Escolha a cor da tinta, não a palavra.
+// 023 · LETTER COLOR! — efeito Stroop: o nome de uma cor pintado com OUTRA cor. Escolha a cor das letras, não a palavra.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG, NAMED, type NamedColor } from "../../gfx/palette.ts";
@@ -108,9 +108,16 @@ function setup(api: MicroAPI): MicroInstance {
       g.text(label, 0, 6, { size: portrait ? 190 : 210, color: NAMED[s.ink].hex, stroke: C.ink, lw: 22, maxWidth: pw - 80 });
       g.pop();
       if (api.result) {
-        g.text(api.t({ en: "INK:", pt: "TINTA:" }) + " " + api.t({ en: NAMED[s.ink].en, pt: NAMED[s.ink].pt }), w / 2, py + ph / 2 - 50, {
+        g.text(api.t({ en: "LETTERS:", pt: "LETRAS:" }) + " " + api.t({ en: NAMED[s.ink].en, pt: NAMED[s.ink].pt }), w / 2, py + ph / 2 - 50, {
           size: 54,
           color: C.ink,
+        });
+      } else {
+        // lembrete no pé da placa: a pegadinha é ler a palavra
+        g.text(api.t({ en: "don't read it, see the color!", pt: "não leia, olhe a cor!" }), w / 2, py + ph / 2 - 46, {
+          size: 46,
+          color: C.gray2,
+          maxWidth: pw - 80,
         });
       }
 
@@ -138,15 +145,15 @@ export const inkColor: Entry<S> = {
     id: "ink-color",
     num: 23,
     name: { en: "Ink Color", pt: "Cor da Tinta" },
-    verb: { en: "INK COLOR!", pt: "COR DA TINTA!" },
+    verb: { en: "LETTER COLOR!", pt: "COR DA LETRA!" },
     hint: { pointer: "tap", keys: "digits" },
     category: "perception",
     family: "choice",
     goal: "complete",
     difficulty: 2,
-    mechanic: "A color word is printed in a different ink (the Stroop effect). Pick the swatch of the ink color, not the word. Later the word keeps changing.",
-    winText: "Pick the color of the ink.",
-    loseText: "Pick the written color or another one, or time runs out.",
+    mechanic: "A color word is painted in a different color (the Stroop effect). Pick the color the letters are painted in, not the color the word names. Later the word keeps changing.",
+    winText: "Pick the color of the letters.",
+    loseText: "Pick the color the word names or another one, or time runs out.",
     timeScale: 1.1,
     minTime: 3,
     bg: BG.dark,

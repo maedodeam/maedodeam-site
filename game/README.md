@@ -1,7 +1,7 @@
 # Microgame Mayhem
 
 Jogo de microgames da MAEDODEAM, publicado em `/play/` (EN) e `/pt-br/play/` (PT-BR).
-Uma sequência rápida de 300 desafios de poucos segundos, com 4 vidas (+1 a cada 10 fases, até 4) e dificuldade crescente.
+Uma sequência rápida de 300 desafios de poucos segundos, com 4 vidas (+1 a cada 10 fases, até 4; ou acima de 4 se fizer as 10 sem errar) e dificuldade crescente.
 Roda inteiro no navegador, em computador, tablet e celular. **Nada é salvo e nada é enviado:**
 sem backend, cookies, storage, analytics ou rede depois do carregamento.
 
@@ -50,9 +50,16 @@ repositório, como o resto do site estático. A página é gerada por `src/build
   visual (`gfx/wtf.ts`) e sons próprios (`warp`, `glitch`, `boing`, `kazoo`, `choir`, `wobble`, `tada`); a instrução
   entra "derretendo" em cores e há um "derretimento" sonoro ao começar.
 - **Vidas.** Começa com 4. A cada 10 microgames concluídos (vencidos ou perdidos), quem ainda está vivo passa pelo
-  "SPEED UP!" e, se tiver menos de 4, ganha +1 vida: o coração surge com brilho e "+1 LIFE!" depois do grito, com um
-  arpejo agudo. Com 4 vidas só aparece o "SPEED UP!". Cada marco dá vida no máximo uma vez, nunca depois do fim de
-  jogo, e a transição continua com a mesma duração (não tira tempo do microgame seguinte).
+  "SPEED UP!" e ganha +1 vida se tiver menos de 4 (recuperação) ou se venceu os 10 sem perder nenhum (bônus: aí passa
+  de 4 e vai acumulando, 5, 6, 7…, sem teto). O coração surge com brilho e "+1 LIFE!" depois do grito, com um arpejo
+  agudo; com 4 ou mais e alguma derrota na dezena, só aparece o "SPEED UP!". Cada marco dá vida no máximo uma vez,
+  nunca depois do fim de jogo, e a transição continua com a mesma duração (não tira tempo do microgame seguinte).
+- **Vidas na tela** (`ui/lives-layout.ts`). Na barra do topo, os corações aparecem enquanto cabem à esquerda dos
+  pontos (no mínimo 4, os vazios mostram as perdidas); se não cabem — celular com 5+ vidas, ou pontuação longa — ou
+  passam de 8, vira "♥ ×N", e o "#NN" do microgame sai antes das vidas se faltar espaço. No interlúdio, a fileira de
+  corações grandes vira um coração com "×N" pelo mesmo critério (em retrato cabem 5; em paisagem, 8).
+- **Telemetria.** A ingestão publicada aceita vidas de 0 a 4: acima disso o resultado vai com 4 ("4 ou mais") e as
+  mudanças de vida acima de 4 não são enviadas (`TELEMETRY_MAX_LIVES` no cliente).
 - **Curva.** Nível interno e duração seguem a mesma curva de antes: o "ciclo" continua sendo de 100 fases
   (`CYCLE_LENGTH`), mesmo com 300 no catálogo.
 

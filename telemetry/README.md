@@ -65,7 +65,7 @@ por partida), `type`, `t` (ms desde o início da partida), `ver` (hash do códig
 | type | campos | quando |
 | --- | --- | --- |
 | `game_start` | `lang` (en/pt), `device` (mobile/tablet/desktop) | começar ou jogar de novo |
-| `microgame_result` | `n` (posição), `mg` (id), `result` (win/lose), `level` (0–1,5), `tier`, `dur`, `used` (s), `lives` (depois), `input` (mouse/touch/keys) | cada microgame |
+| `microgame_result` | `n` (posição), `mg` (id), `result` (win/lose), `level` (0–1,5), `tier`, `dur`, `used` (s), `lives` (depois; 0–4, acima de 4 vai 4), `input` (mouse/touch/keys) | cada microgame |
 | `life_changed` | `n`, `from`, `to`, `reason` (lose/milestone) | perdeu uma vida ou ganhou no SPEED UP |
 | `game_over` | `n` (jogados), `score`, `wins` | fim de jogo |
 | `game_abandon` | `n`, `reason` (quit/pagehide) | saiu para o título ou fechou a página no meio |

@@ -1,10 +1,9 @@
 // 052 · DUCK! — coisas voam pelo corredor: no alto (aviões de papel, crachás) ou rente ao chão (cadeiras, robôs aspiradores).
-// Deslize para cima para pular, para baixo para abaixar.
+// Toque na metade de cima para pular, na de baixo para abaixar (segurando, fica abaixado). Deslizar curto e ↑/↓ também valem.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
 import { person } from "../../gfx/art.ts";
-import { sideTap } from "../../kit/mover.ts";
 import { mem } from "../../testing/botkit.ts";
 import { prog, mix } from "./util.ts";
 
@@ -29,6 +28,10 @@ interface S {
   W: number;
   clock: number;
   scroll: number;
+  /** Gesto do ponteiro em curso: 0 = nenhum; -1 = pulo, 1 = abaixar (o que ele pediu por último). */
+  gest: -1 | 0 | 1;
+  /** O gesto atual já virou um deslizar (só conta um por gesto). */
+  swiped: boolean;
 }
 
 const GRAV = 4600;
@@ -42,6 +45,10 @@ const HIGH_BOT = 150;
 const HIGH_TOP = 230;
 const STAND_H = 250;
 const DUCK_H = 120;
+/** Velocidade de queda quando pede para abaixar no ar (cai na hora e já chega abaixado). */
+const SLAM = 3200;
+/** Arrasto vertical mínimo (unidades do palco) para contar como deslizar. Bem abaixo do SWIPE_MIN global. */
+const SWIPE = 36;
 
 function setup(api: MicroAPI): MicroInstance {
   const { w, h, rng } = api;
@@ -64,6 +71,8 @@ function setup(api: MicroAPI): MicroInstance {
     W,
     clock: 0,
     scroll: 0,
+    gest: 0,
+    swiped: false,
   };
   const v = mix(650, 1000, p);
   let t = 1.25;
@@ -83,19 +92,45 @@ function setup(api: MicroAPI): MicroInstance {
     update(dt) {
       s.clock += dt;
       const inp = api.input;
-      const grounded = s.jy <= 0;
       if (!s.hit && !api.result) {
-        const d = sideTap(inp, w, h, "y");
-        if (d === -1 && grounded) {
-          s.vy = JUMP;
-          s.duck = 0;
-          api.sfx("jump");
-        } else if (d === 1 && grounded) {
-          if (s.duck <= 0) api.sfx("slide");
-          s.duck = DUCK;
+        // Antes (sideTap) só valia ao soltar, e um toque em que o dedo andasse entre 40 e 90 não fazia nada
+        // (nem toque, nem deslizar). Agora reage no instante em que encosta:
+        // metade de cima = pula, metade de baixo = abaixa (e segurar mantém abaixado).
+        // Um deslizar curto (>= SWIPE) no mesmo gesto corrige a ação; abaixar no ar faz cair na hora.
+        const act = (d: -1 | 1) => {
+          if (d === -1) {
+            if (s.jy > 0) return;
+            s.vy = JUMP;
+            s.duck = 0;
+            api.sfx("jump");
+          } else {
+            if (s.duck <= 0) api.sfx("slide");
+            s.duck = DUCK;
+            if (s.jy > 0) s.vy = Math.min(s.vy, -SLAM);
+          }
+        };
+        if (inp.keyPressed("up")) act(-1);
+        else if (inp.keyPressed("down")) act(1);
+        if (inp.pressed) {
+          s.gest = inp.startY < h / 2 ? -1 : 1;
+          s.swiped = false;
+          act(s.gest);
         }
-        // segurar ↓ mantém abaixado
-        if (inp.key("down") && grounded && s.duck > 0) s.duck = Math.max(s.duck, 0.05);
+        if (s.gest !== 0 && !s.swiped && (inp.down || inp.released)) {
+          const dy = inp.y - inp.startY;
+          if (Math.abs(dy) >= SWIPE && Math.abs(dy) >= Math.abs(inp.x - inp.startX) * 0.8) {
+            s.swiped = true;
+            const d = dy < 0 ? -1 : 1;
+            if (d !== s.gest) {
+              s.gest = d;
+              act(d);
+            }
+          }
+        }
+        // segurar ↓ ou o dedo (num gesto de abaixar) mantém abaixado
+        const holdDuck = inp.key("down") || (s.gest === 1 && inp.down);
+        if (holdDuck && s.jy <= 0 && s.duck > 0) s.duck = Math.max(s.duck, 0.05);
+        if (!inp.down) s.gest = 0;
       }
       s.duck = Math.max(0, s.duck - dt);
       s.vy -= GRAV * dt;
@@ -204,6 +239,17 @@ function setup(api: MicroAPI): MicroInstance {
         g.pop();
       }
       g.pop();
+      // dica das metades do palco (some depois dos primeiros segundos)
+      const fade = Math.max(0, Math.min(1, (2.4 - s.clock) / 0.6));
+      if (fade > 0 && !api.result) {
+        g.push();
+        g.alpha(0.8 * fade);
+        const lbl = { size: portrait ? 46 : 50, color: C.ink };
+        g.line(w / 2 - 170, h / 2, w / 2 + 170, h / 2, C.ink, 4);
+        g.text("▲ " + api.t({ en: "JUMP", pt: "PULA" }), w / 2, h / 2 - 44, lbl);
+        g.text("▼ " + api.t({ en: "DUCK", pt: "ABAIXA" }), w / 2, h / 2 + 48, lbl);
+        g.pop();
+      }
     },
   };
 }
@@ -214,12 +260,12 @@ export const duckJump: Entry<S> = {
     num: 52,
     name: { en: "Duck!", pt: "Abaixa!" },
     verb: { en: "DUCK!", pt: "ABAIXA!" },
-    hint: { pointer: "swipe", keys: "ud" },
+    hint: { pointer: "tap", keys: "ud" },
     category: "dodge",
     family: "swipe",
     goal: "survive",
     difficulty: 2,
-    mechanic: "Things fly down the hallway at head height (paper planes, badge boomerangs) or along the floor (rolling chairs, robot vacuums). A '!' on the right edge shows the height. Swipe up (or tap the top half, or press up) to jump; swipe down to duck.",
+    mechanic: "Things fly down the hallway at head height (paper planes, badge boomerangs) or along the floor (rolling chairs, robot vacuums). A '!' on the right edge shows the height. Tap the top half of the screen (or swipe up, or press up) to jump; tap and hold the bottom half (or swipe down, or press down) to duck. Ducking in mid-air drops you straight down.",
     winText: "Dodge everything until time runs out.",
     loseText: "Get hit by something.",
     minTime: 3,
