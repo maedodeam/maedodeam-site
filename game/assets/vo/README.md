@@ -1,6 +1,6 @@
 # Locução do "SPEED UP" — gravações originais
 
-O jogo tem um locutor de monstro que anuncia cada aumento de velocidade, sobre um corte dramático da música.
+Um locutor anuncia cada aumento de velocidade, sobre um corte dramático da música.
 
 **Sem gravações aqui, o jogo usa rugidos sintetizados sem palavras** (a palavra "SPEED UP!" aparece na tela).
 A síntese de fala por código foi testada com reconhecimento de fala offline e não ficou inteligível o bastante para
@@ -31,8 +31,9 @@ As 11 que precisaram de 1,8× a 2,2× de aceleração (`gogogo-2/3/4`, `mayhem-3
 
 Duas opções de arquivo (`.mp3`, `.ogg`, `.wav` ou `.m4a`):
 
-- **`<fala>.raw.mp3`** — a sua voz crua. O jogo aplica a voz de monstro sozinho: camadas mais graves, saturação,
-  compressão forte, eco e reverb.
+- **`<fala>.raw.mp3`** — a sua voz crua. O jogo aplica um tratamento natural (`cleanVoice`): corta o grave de
+  microfone, compressão leve e uma sala curta e discreta. A voz de monstro (`monsterize`: camadas mais graves,
+  saturação, eco e reverb longo) ficou só no laboratório: sujava e embolava o fim das falas (escolha de ouvido, nov/2026).
 - **`<fala>.mp3`** — já processada do jeito que você quiser; o jogo toca como está.
 
 Regras práticas:

@@ -3,7 +3,7 @@
 // O contexto de áudio só é criado depois de um gesto do jogador (exigência dos navegadores).
 import type { SfxName } from "../core/types.ts";
 import { MusicEngine } from "./music.ts";
-import { ANNOUNCEMENTS, monsterize, renderAnnouncement, renderSyllable, SYLLABLES } from "./voice.ts";
+import { ANNOUNCEMENTS, cleanVoice, renderAnnouncement, renderSyllable, SYLLABLES } from "./voice.ts";
 import { RECORDINGS } from "./recordings.gen.ts";
 import { SPEEDUP_EVERY } from "../core/difficulty.ts";
 import { parseRecordings, pickClip, speedupPhase, type VoiceClip } from "./voice-pool.ts";
@@ -77,7 +77,7 @@ export class AudioManager {
       for (const id of Object.keys(SYLLABLES)) {
         this.chops.set(id, await renderSyllable(id, ctx.sampleRate));
       }
-      // Falas gravadas têm prioridade (sorteadas por fase; "<id>.raw" recebe a cadeia de monstro).
+      // Falas gravadas têm prioridade (sorteadas por fase; "<id>.raw" recebe o tratamento natural com sala curta).
       this.clips = parseRecordings(RECORDINGS);
       for (const c of this.clips) this.voiceSource.set(c.id, "recording");
       if (this.clips.length) {
@@ -97,7 +97,7 @@ export class AudioManager {
     }
   }
 
-  /** Sorteia e deixa pronta (decodificada e, se crua, com a voz de monstro) a fala da aceleração da fase `phase`. */
+  /** Sorteia e deixa pronta (decodificada e, se crua, com o tratamento natural) a fala da aceleração da fase `phase`. */
   private async prepareVoice(phase: number): Promise<void> {
     const ctx = this.ctx;
     if (!ctx || !this.clips.length) return;
@@ -109,7 +109,8 @@ export class AudioManager {
       if (!clip) return;
       try {
         const dec = await decodeBase64(ctx, clip.data);
-        const buf = clip.raw ? await monsterize(dec, ctx.sampleRate) : dec;
+        // natural, como foi gravada (a voz de monstro sujava e embolava o fim das falas; escolhido de ouvido no laboratório)
+        const buf = clip.raw ? await cleanVoice(dec, ctx.sampleRate, true) : dec;
         if (token === this.voiceToken) this.nextVoice = { clip, buf };
         return;
       } catch {

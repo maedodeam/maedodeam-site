@@ -6,7 +6,7 @@
 import { build } from "esbuild";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -62,8 +62,13 @@ if (existsSync(join(rev, "composer.ts"))) {
 }
 await bundle(join(root, "game/dev/music-lab.ts"), "music-lab.js");
 writeFileSync(join(out, "index.html"), MUSIC_LAB_HTML(engines));
+// Vozes gravadas para comparar (opcional, fora do git): game/.dev/music-lab/vo/<fonte>/<fala>.wav
+const voDir = join(out, "vo");
+const voIndex: Record<string, string[]> = {};
+if (existsSync(voDir)) for (const s of readdirSync(voDir).sort()) voIndex[s] = readdirSync(join(voDir, s)).filter((f) => f.endsWith(".wav")).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+writeFileSync(join(out, "vo.json"), JSON.stringify(voIndex));
 
-const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+const TYPES: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".json": "application/json", ".wav": "audio/wav" };
 createServer((req, res) => {
   const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
   const file = normalize(join(out, path === "/" ? "index.html" : path));

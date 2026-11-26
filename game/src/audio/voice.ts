@@ -562,3 +562,41 @@ export async function monsterize(input: AudioBuffer, sampleRate = 44100): Promis
   comp.connect(conv).connect(wet).connect(ctx.destination);
   return ctx.startRendering();
 }
+
+/**
+ * Voz natural (como foi gravada): só tira o grave de microfone, compressão leve e, com `room`, uma sala curta e discreta.
+ * Sem camadas mais graves, saturação nem eco. Normaliza o pico em `peak`.
+ */
+export async function cleanVoice(input: AudioBuffer, sampleRate = 44100, room = true, peak = 0.9): Promise<AudioBuffer> {
+  const tail = room ? 0.6 : 0.05;
+  const ctx = new OfflineAudioContext(2, Math.ceil((input.duration + tail) * sampleRate), sampleRate);
+  const s = ctx.createBufferSource();
+  s.buffer = input;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 90;
+  hp.Q.value = 0.7;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -20;
+  comp.knee.value = 6;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.004;
+  comp.release.value = 0.12;
+  s.connect(hp).connect(comp).connect(ctx.destination);
+  if (room) {
+    const conv = ctx.createConvolver();
+    conv.buffer = reverbIR(ctx, 0.55, 3.5);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.14;
+    comp.connect(conv).connect(wet).connect(ctx.destination);
+  }
+  s.start(0);
+  const out = await ctx.startRendering();
+  let pk = 0;
+  for (let c = 0; c < out.numberOfChannels; c++) for (const v of out.getChannelData(c)) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let c = 0; c < out.numberOfChannels; c++) {
+    const d = out.getChannelData(c);
+    for (let i = 0; i < d.length; i++) d[i] *= peak / pk;
+  }
+  return out;
+}
