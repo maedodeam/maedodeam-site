@@ -10,14 +10,15 @@ import { fileURLToPath } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const dev = process.argv.includes("--dev");
 
-// Gravações originais de locução: game/assets/vo/<id>.mp3 (pronta) ou <id>.raw.mp3 (o jogo aplica a voz de monstro).
+// Gravações originais de locução: game/assets/vo/<id>.mp3 (pronta) ou <id>.raw.mp3 (o jogo aplica a voz de monstro);
+// "<id>@30.raw.mp3" só toca a partir da aceleração da fase 30 (ver src/audio/voice-pool.ts).
 // Vão embutidas no bundle (base64), para não haver nenhuma requisição depois do carregamento.
 {
   const voDir = join(root, "game/assets/vo");
   const entries: string[] = [];
   if (existsSync(voDir)) {
     for (const f of readdirSync(voDir).sort()) {
-      const m = /^([a-z0-9-]+(?:\.raw)?)\.(mp3|ogg|wav|m4a)$/i.exec(f);
+      const m = /^([a-z0-9-]+(?:@\d+)?(?:\.raw)?)\.(mp3|ogg|wav|m4a)$/i.exec(f);
       if (!m) continue;
       entries.push(`  ${JSON.stringify(m[1].toLowerCase())}: ${JSON.stringify(readFileSync(join(voDir, f)).toString("base64"))},`);
     }
