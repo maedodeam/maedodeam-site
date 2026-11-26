@@ -326,7 +326,7 @@ export class MusicEngine {
    * Aceleração: corte dramático → locução → virada → volta mais rápida (e mais alta, em outro tom) no downbeat
    * que coincide com o fim da tela de aceleração (`duration` segundos a partir de agora).
    */
-  speedup(tier: number, duration: number): void {
+  speedup(tier: number, duration: number, voice?: AudioBuffer | null): void {
     const now = this.now;
     const newBpm = bpmForTier(tier);
     const cutAt = Math.max(now + 0.005, Math.min(this.nextStepTime, now + LOOKAHEAD));
@@ -338,8 +338,12 @@ export class MusicEngine {
     tapeStop(b, plan.cut, this.chordNotes(48, 72), 0.4);
     boom(b, plan.cut, 1);
     // 2) a voz
-    const id = this.announceOrder.length ? this.announceOrder[this.announceIdx++ % this.announceOrder.length] : null;
-    const buf = id ? this.announcements.get(id) : null;
+    // `voice` informado (falas gravadas sorteadas por fase, ou null = sem voz); senão, a rotação dos anúncios
+    let buf = voice;
+    if (buf === undefined) {
+      const id = this.announceOrder.length ? this.announceOrder[this.announceIdx++ % this.announceOrder.length] : null;
+      buf = id ? this.announcements.get(id) : null;
+    }
     if (buf) {
       const s = this.ctx.createBufferSource();
       s.buffer = buf;

@@ -22,6 +22,13 @@ gagueje na primeira sílaba e prolongue a vogal.
 
 Outras falas também valem: qualquer nome de arquivo em minúsculas (`hyper.raw.mp3`, por exemplo) entra na rotação.
 
+Várias tentativas da mesma fala também valem (`faster-1.raw.mp3`, `faster-2.raw.mp3`...): cada aceleração sorteia uma
+fala, sem repetir as últimas. Com **`@<fase>`** no nome, a fala só entra a partir daquela aceleração: `turbo-1@30.raw.mp3`
+só toca da fase 30 em diante (as acelerações das fases 10 e 20 sorteiam só as falas sem `@`).
+
+**Gravações atuais (nov/2026):** 37 tentativas cruas de 6 falas, cortadas e aceleradas para 1,3 s sem mudar o tom.
+As 11 que precisaram de 1,8× a 2,2× de aceleração (`gogogo-2/3/4`, `mayhem-3/4/5` e todas do `turbo`) têm `@30`.
+
 Duas opções de arquivo (`.mp3`, `.ogg`, `.wav` ou `.m4a`):
 
 - **`<fala>.raw.mp3`** — a sua voz crua. O jogo aplica a voz de monstro sozinho: camadas mais graves, saturação,
