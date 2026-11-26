@@ -36,6 +36,13 @@ achar o som que incomoda. Números do medidor ajudam, mas não provam que algo s
   <button id="stop">■ parar</button><button id="next">próxima volta / cena ▸</button><button id="speed">SPEED UP ▸ próximo nível</button>
   <label><input id="sim" type="checkbox"> simular a partida (contagem regressiva + vinhetas de vitória/derrota)</label>
 </section>
+<section id="vo" hidden>
+  <b>Vozes do SPEED UP</b> — o botão SPEED UP acima usa estas escolhas (toque uma faixa de níveis antes).<br>
+  Tratamento: <span id="voFx"></span><br>
+  Fonte: <span id="voSrc"></span><br>
+  Fala: <select id="voTake"></select> <button id="voSolo">▶ só a voz</button>
+  &nbsp; volume da voz <input id="voVol" type="range" min="-18" max="6" step="1" value="0"> <span id="voVolTxt">0 dB</span><br><span id="voLast"></span>
+</section>
 <section id="status"></section>
 <section><canvas id="spec" width="720" height="150"></canvas><div id="lvl"></div></section>
 <section><button id="all">todos os instrumentos</button><div id="insts"></div></section>

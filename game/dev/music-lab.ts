@@ -144,11 +144,15 @@ function stopSim(): void {
   eng?.stopCountdown();
 }
 
-function speedup(): void {
+async function speedup(): Promise<void> {
   if (!eng || tier === 0) return;
+  // com vozes gravadas para comparar, usa a escolha da seção "Vozes do SPEED UP"; senão, os rugidos sintetizados
+  const voice = Object.keys(voIndex).length ? await voBuffer(voPick()) : undefined;
+  if (!eng) return;
   stopSim();
   const next = tier + 1;
-  eng.speedup(next, E().SPEEDUP_TIME);
+  eng.voiceOut.gain.value = voGain();
+  eng.speedup(next, E().SPEEDUP_TIME, voice);
   window.setTimeout(() => {
     tier = next;
     if (sim) startSim();
@@ -282,7 +286,7 @@ function build(): void {
     if (!eng) return;
     void play(tier, Math.floor(eng.globalStep / 128) + 1);
   };
-  $("speed").onclick = speedup;
+  $("speed").onclick = () => void speedup();
   ($("sim") as HTMLInputElement).onchange = (e) => {
     sim = (e.target as HTMLInputElement).checked;
     if (sim && eng && tier > 0) startSim();
@@ -299,4 +303,100 @@ function build(): void {
   status();
 }
 
+// ---------- vozes gravadas do SPEED UP: comparar tratamentos, fontes e volume (escolha de ouvido) ----------
+const VO_FX = [
+  ["monstro", "A · voz de monstro (a anterior)"],
+  ["sala", "B · natural + sala curta (a publicada)"],
+  ["seco", "C · natural seco"],
+] as const;
+const VO_SRC: Record<string, string> = { acelerada: "acelerada para 1,3 s (a do jogo)", original: "original, sem acelerar (1,5–2,9 s)" };
+const VO_LATE = new Set(["gogogo-2", "gogogo-3", "gogogo-4", "mayhem-3", "mayhem-4", "mayhem-5", "turbo-1", "turbo-2", "turbo-3", "turbo-4", "turbo-5"]);
+/** Ganho do voiceOut no jogo (music.ts): 0 dB no controle = o volume publicado. */
+const VOICE_BASE = 1.1;
+let voIndex: Record<string, string[]> = {};
+let voFx = "sala";
+let voSrc = "acelerada";
+let voDb = 0;
+const voRaw = new Map<string, AudioBuffer>();
+const voDone = new Map<string, AudioBuffer>();
+
+async function voBuffer(take: string): Promise<AudioBuffer> {
+  const key = `${voSrc}/${take}`;
+  const done = voDone.get(`${voFx}|${key}`);
+  if (done) return done;
+  let raw = voRaw.get(key);
+  if (!raw) {
+    raw = await ctx!.decodeAudioData(await (await fetch(`vo/${key}`)).arrayBuffer());
+    voRaw.set(key, raw);
+  }
+  const v = E().voice;
+  const b: AudioBuffer = voFx === "monstro" ? await v.monsterize(raw, ctx!.sampleRate) : await v.cleanVoice(raw, ctx!.sampleRate, voFx === "sala");
+  voDone.set(`${voFx}|${key}`, b);
+  return b;
+}
+function voPick(): string {
+  const v = ($("voTake") as HTMLSelectElement).value;
+  const list = voIndex[voSrc] ?? [];
+  const take = v !== "*" && list.includes(v) ? v : list[Math.floor(Math.random() * list.length)];
+  $("voLast").textContent = ` tocando: ${take.replace(".wav", "")} · ${VO_FX.find((f) => f[0] === voFx)![1]} · ${voSrc} · ${voDb > 0 ? "+" : ""}${voDb} dB`;
+  return take;
+}
+const voGain = () => VOICE_BASE * Math.pow(10, voDb / 20);
+async function voSolo(): Promise<void> {
+  setupCtx();
+  await ctx!.resume();
+  const b = await voBuffer(voPick());
+  const s = ctx!.createBufferSource();
+  s.buffer = b;
+  const g = ctx!.createGain();
+  g.gain.value = voGain();
+  s.connect(g).connect(musicGain);
+  s.start();
+}
+async function voInit(): Promise<void> {
+  try {
+    voIndex = await (await fetch("vo.json")).json();
+  } catch {
+    return;
+  }
+  if (!Object.keys(voIndex).length) return;
+  $("vo").hidden = false;
+  const group = (id: string, items: [string, string][], get: () => string, set: (v: string) => void, after?: () => void) => {
+    const box = $(id);
+    const paint = () => box.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.v === get()));
+    for (const [v, label] of items) {
+      const b = document.createElement("button");
+      b.textContent = label;
+      b.dataset.v = v;
+      b.onclick = () => {
+        set(v);
+        paint();
+        after?.();
+      };
+      box.append(b);
+    }
+    paint();
+  };
+  const fillTakes = () => {
+    const sel = $("voTake") as HTMLSelectElement;
+    const cur = sel.value;
+    sel.innerHTML = "";
+    sel.append(new Option("sorteio (todas)", "*"));
+    for (const f of voIndex[voSrc] ?? []) {
+      const id = f.replace(".wav", "");
+      sel.append(new Option(`${id}${VO_LATE.has(id) ? "  (só da fase 30)" : ""}`, f));
+    }
+    sel.value = [...sel.options].some((o) => o.value === cur) ? cur : "*";
+  };
+  group("voFx", VO_FX.map(([a, b]) => [a, b]), () => voFx, (v) => (voFx = v));
+  group("voSrc", Object.keys(voIndex).map((s) => [s, VO_SRC[s] ?? s]), () => voSrc, (v) => (voSrc = v), fillTakes);
+  fillTakes();
+  $("voSolo").onclick = () => void voSolo();
+  $("voVol").addEventListener("input", (e) => {
+    voDb = Number((e.target as HTMLInputElement).value);
+    $("voVolTxt").textContent = `${voDb > 0 ? "+" : ""}${voDb} dB`;
+  });
+}
+
 build();
+void voInit();
