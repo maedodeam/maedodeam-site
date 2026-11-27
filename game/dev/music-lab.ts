@@ -36,7 +36,7 @@ const BANDS = [
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 let ctx: AudioContext | null = null;
-let musicGain: GainNode, master: GainNode, preAn: AnalyserNode, postAn: AnalyserNode;
+let musicGain: GainNode, musicDuck: GainNode, master: GainNode, preAn: AnalyserNode, postAn: AnalyserNode;
 let eng: any = null;
 let engineName = Object.keys(ENGINES)[0];
 let tier = 1;
@@ -75,6 +75,8 @@ function setupCtx(): void {
   musicGain = ctx.createGain();
   musicGain.gain.value = 0.55;
   musicGain.connect(master);
+  musicDuck = ctx.createGain();
+  musicDuck.connect(musicGain);
   requestAnimationFrame(meter);
 }
 
@@ -106,7 +108,10 @@ async function play(t: number, loop = 0): Promise<void> {
   $("status").textContent = "preparando vozes…";
   const chops = await chopsFor(engineName);
   const voices = await voicesFor(engineName);
-  eng = new (E().MusicEngine)(ctx!, musicGain, chops);
+  eng = new (E().MusicEngine)(ctx!, musicDuck, chops);
+  // a voz não passa pelo ducking da música
+  eng.voiceOut.disconnect();
+  eng.voiceOut.connect(musicGain);
   for (const [id, b] of voices) eng.announcements.set(id, b);
   eng.setAnnouncements([...voices.keys()]);
   eng.filterOut = new Set(off);
@@ -152,7 +157,11 @@ async function speedup(): Promise<void> {
   stopSim();
   const next = tier + 1;
   eng.voiceOut.gain.value = voGain();
+  // o motor publicado faz o ducking; numa versão antiga do motor, o laboratório faz por fora
+  const engineDucks = "voiceDuckDb" in eng;
+  if (engineDucks) eng.voiceDuckDb = voRev.duck;
   eng.speedup(next, E().SPEEDUP_TIME, voice);
+  if (voice && !engineDucks) duckMusic(voice);
   window.setTimeout(() => {
     tier = next;
     if (sim) startSim();
@@ -306,23 +315,105 @@ function build(): void {
 // ---------- vozes gravadas do SPEED UP: comparar tratamentos, fontes e volume (escolha de ouvido) ----------
 const VO_FX = [
   ["monstro", "A · voz de monstro (a anterior)"],
-  ["sala", "B · natural + sala curta (a publicada)"],
+  ["sala", "B · natural + sala curta (a anterior)"],
   ["seco", "C · natural seco"],
+  ["reverb", "D · reverb + compressão ajustáveis (a publicada)"],
 ] as const;
 const VO_SRC: Record<string, string> = { acelerada: "acelerada para 1,3 s (a do jogo)", original: "original, sem acelerar (1,5–2,9 s)" };
 const VO_LATE = new Set(["gogogo-2", "gogogo-3", "gogogo-4", "mayhem-3", "mayhem-4", "mayhem-5", "turbo-1", "turbo-2", "turbo-3", "turbo-4", "turbo-5"]);
 /** Ganho do voiceOut no jogo (music.ts): 0 dB no controle = o volume publicado. */
 const VOICE_BASE = 1.1;
 let voIndex: Record<string, string[]> = {};
-let voFx = "sala";
+let voFx = "reverb";
 let voSrc = "acelerada";
 let voDb = 0;
+/**
+ * Opção D: reverb (quantidade %, decay s, brilho da cauda Hz, pré-atraso ms) e compressão (limiar dB, razão).
+ * A sala da B = 14 %, 0,55 s; compressão da B = -20 dB, 3:1. Ducking (dB) vale para qualquer tratamento.
+ */
+const voRev = { wet: 12, size: 0.45, bright: 6000, pre: 25, thr: -24, ratio: 4, duck: 4 };
+const revKey = () => `reverb:${voRev.wet}:${voRev.size}:${voRev.bright}:${voRev.pre}:${voRev.thr}:${voRev.ratio}`;
+const revTxt = () =>
+  `D · reverb ${voRev.wet} % · decay ${voRev.size.toFixed(2)} s · brilho ${(voRev.bright / 1000).toFixed(1)} kHz · pré ${voRev.pre} ms · compressão ${voRev.thr} dB ${voRev.ratio}:1`;
+
+/** Abaixa a música durante a fala (ataque 40 ms, solta em 200 ms). A voz começa ~0,1 s depois do clique (corte + 60 ms). */
+function duckMusic(voice: AudioBuffer): void {
+  const g = musicDuck.gain;
+  const t = ctx!.currentTime;
+  const low = Math.pow(10, -voRev.duck / 20);
+  const speech = Math.min(voice.duration, 1.4); // a fala; a cauda do reverb não segura o ducking
+  g.cancelScheduledValues(t);
+  g.setValueAtTime(g.value, t);
+  g.linearRampToValueAtTime(low, t + 0.04);
+  g.setValueAtTime(low, t + 0.12 + speech);
+  g.linearRampToValueAtTime(1, t + 0.32 + speech);
+}
+
+/** Cauda de reverb (ruído com queda exponencial, estéreo), do tamanho escolhido. */
+function labIR(c: BaseAudioContext, seconds: number): AudioBuffer {
+  const len = Math.max(1, Math.floor(c.sampleRate * seconds));
+  const b = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    let s = 2468 + ch * 1357;
+    for (let i = 0; i < len; i++) {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      d[i] = (s / 2147483648 - 1) * Math.exp((-6.9 * i) / len); // cai 60 dB no tamanho escolhido
+    }
+  }
+  return b;
+}
+/** Opção D: tira o grave de microfone, compressão ajustável e reverb com os controles; normaliza o pico como no jogo. */
+async function withReverb(raw: AudioBuffer, sr: number): Promise<AudioBuffer> {
+  const pre = voRev.pre / 1000;
+  const ctxR = new OfflineAudioContext(2, Math.ceil((raw.duration + pre + voRev.size + 0.05) * sr), sr);
+  const s0 = ctxR.createBufferSource();
+  s0.buffer = raw;
+  const hp0 = ctxR.createBiquadFilter();
+  hp0.type = "highpass";
+  hp0.frequency.value = 90;
+  hp0.Q.value = 0.7;
+  const comp = ctxR.createDynamicsCompressor();
+  comp.threshold.value = voRev.thr;
+  comp.knee.value = 6;
+  comp.ratio.value = voRev.ratio;
+  comp.attack.value = 0.006;
+  comp.release.value = 0.12;
+  s0.connect(hp0).connect(comp);
+  const src = comp;
+  src.connect(ctxR.destination);
+  if (voRev.wet > 0) {
+    const dl = ctxR.createDelay(0.2);
+    dl.delayTime.value = pre;
+    const conv = ctxR.createConvolver();
+    conv.buffer = labIR(ctxR, voRev.size);
+    const hp = ctxR.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 200; // sem embolar o grave
+    const lp = ctxR.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = voRev.bright;
+    const wet = ctxR.createGain();
+    wet.gain.value = voRev.wet / 100;
+    src.connect(dl).connect(conv).connect(hp).connect(lp).connect(wet).connect(ctxR.destination);
+  }
+  s0.start(0);
+  const out = await ctxR.startRendering();
+  let pk = 0;
+  for (let c = 0; c < out.numberOfChannels; c++) for (const v of out.getChannelData(c)) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let c = 0; c < out.numberOfChannels; c++) {
+    const d = out.getChannelData(c);
+    for (let i = 0; i < d.length; i++) d[i] *= 0.9 / pk;
+  }
+  return out;
+}
 const voRaw = new Map<string, AudioBuffer>();
 const voDone = new Map<string, AudioBuffer>();
 
 async function voBuffer(take: string): Promise<AudioBuffer> {
   const key = `${voSrc}/${take}`;
-  const done = voDone.get(`${voFx}|${key}`);
+  const fx = voFx === "reverb" ? revKey() : voFx;
+  const done = voDone.get(`${fx}|${key}`);
   if (done) return done;
   let raw = voRaw.get(key);
   if (!raw) {
@@ -330,15 +421,22 @@ async function voBuffer(take: string): Promise<AudioBuffer> {
     voRaw.set(key, raw);
   }
   const v = E().voice;
-  const b: AudioBuffer = voFx === "monstro" ? await v.monsterize(raw, ctx!.sampleRate) : await v.cleanVoice(raw, ctx!.sampleRate, voFx === "sala");
-  voDone.set(`${voFx}|${key}`, b);
+  const sr = ctx!.sampleRate;
+  const b: AudioBuffer =
+    voFx === "monstro" ? await v.monsterize(raw, sr)
+    : voFx === "reverb"
+      ? (v.speedupVoice
+        ? await v.speedupVoice(raw, sr, { wet: voRev.wet / 100, decay: voRev.size, pre: voRev.pre / 1000, bright: voRev.bright, threshold: voRev.thr, ratio: voRev.ratio })
+        : await withReverb(raw, sr))
+    : await v.cleanVoice(raw, sr, voFx === "sala");
+  voDone.set(`${fx}|${key}`, b);
   return b;
 }
 function voPick(): string {
   const v = ($("voTake") as HTMLSelectElement).value;
   const list = voIndex[voSrc] ?? [];
   const take = v !== "*" && list.includes(v) ? v : list[Math.floor(Math.random() * list.length)];
-  $("voLast").textContent = ` tocando: ${take.replace(".wav", "")} · ${VO_FX.find((f) => f[0] === voFx)![1]} · ${voSrc} · ${voDb > 0 ? "+" : ""}${voDb} dB`;
+  $("voLast").textContent = ` tocando: ${take.replace(".wav", "")} · ${voFx === "reverb" ? revTxt() : VO_FX.find((f) => f[0] === voFx)![1]} · ${voSrc} · ${voDb > 0 ? "+" : ""}${voDb} dB · ducking ${voRev.duck} dB`;
   return take;
 }
 const voGain = () => VOICE_BASE * Math.pow(10, voDb / 20);
@@ -392,6 +490,26 @@ async function voInit(): Promise<void> {
   group("voSrc", Object.keys(voIndex).map((s) => [s, VO_SRC[s] ?? s]), () => voSrc, (v) => (voSrc = v), fillTakes);
   fillTakes();
   $("voSolo").onclick = () => void voSolo();
+  // controles do reverb (D): mexer em qualquer um já escolhe a D
+  const rev: [string, keyof typeof voRev, (n: number) => string][] = [
+    ["revWet", "wet", (n) => `${n} %`],
+    ["revSize", "size", (n) => `${n.toFixed(2)} s`],
+    ["revBright", "bright", (n) => `${(n / 1000).toFixed(1)} kHz`],
+    ["revPre", "pre", (n) => `${n} ms`],
+    ["revThr", "thr", (n) => `${n} dB`],
+    ["revRatio", "ratio", (n) => `${n}:1`],
+    ["revDuck", "duck", (n) => (n ? `-${n} dB` : "desligado")],
+  ];
+  for (const [id, k, fmt] of rev) {
+    const inp = $(id) as HTMLInputElement;
+    inp.value = String(voRev[k]);
+    $(id + "Txt").textContent = fmt(voRev[k]);
+    inp.addEventListener("input", () => {
+      voRev[k] = Number(inp.value);
+      $(id + "Txt").textContent = fmt(voRev[k]);
+      if (k !== "duck" && voFx !== "reverb") ($("voFx").querySelector('[data-v="reverb"]') as HTMLButtonElement).click();
+    });
+  }
   $("voVol").addEventListener("input", (e) => {
     voDb = Number((e.target as HTMLInputElement).value);
     $("voVolTxt").textContent = `${voDb > 0 ? "+" : ""}${voDb} dB`;

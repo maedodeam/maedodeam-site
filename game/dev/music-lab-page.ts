@@ -39,6 +39,14 @@ achar o som que incomoda. Números do medidor ajudam, mas não provam que algo s
 <section id="vo" hidden>
   <b>Vozes do SPEED UP</b> — o botão SPEED UP acima usa estas escolhas (toque uma faixa de níveis antes).<br>
   Tratamento: <span id="voFx"></span><br>
+  Reverb (D): wet mix <input id="revWet" type="range" min="0" max="60" step="1"> <span id="revWetTxt"></span> <small>(sugerido 8–15 %)</small>
+  &nbsp; decay <input id="revSize" type="range" min="0.1" max="2" step="0.05"> <span id="revSizeTxt"></span> <small>(0,3–0,6 s)</small>
+  &nbsp; pré-delay <input id="revPre" type="range" min="0" max="120" step="5"> <span id="revPreTxt"></span> <small>(20–30 ms)</small>
+  &nbsp; brilho da cauda <input id="revBright" type="range" min="1500" max="12000" step="500"> <span id="revBrightTxt"></span><br>
+  Compressão (D): limiar <input id="revThr" type="range" min="-40" max="0" step="1"> <span id="revThrTxt"></span>
+  &nbsp; razão <input id="revRatio" type="range" min="1" max="12" step="0.5"> <span id="revRatioTxt"></span> <small>(moderada: 3–4:1)</small><br>
+  Ducking da música durante a fala (qualquer tratamento): <input id="revDuck" type="range" min="0" max="12" step="1"> <span id="revDuckTxt"></span> <small>(3–5 dB; o jogo usa 4)</small>
+  <br><small>O jogo usa a D com os valores iniciais destes controles. A B (anterior) usava sala de 0,55 s a 14 % e compressão -20 dB 3:1, sem ducking. O SPEED UP dura 2,4 s e a voz começa logo no corte da música.</small><br>
   Fonte: <span id="voSrc"></span><br>
   Fala: <select id="voTake"></select> <button id="voSolo">▶ só a voz</button>
   &nbsp; volume da voz <input id="voVol" type="range" min="-18" max="6" step="1" value="0"> <span id="voVolTxt">0 dB</span><br><span id="voLast"></span>

@@ -3,7 +3,7 @@
 // O contexto de áudio só é criado depois de um gesto do jogador (exigência dos navegadores).
 import type { SfxName } from "../core/types.ts";
 import { MusicEngine } from "./music.ts";
-import { ANNOUNCEMENTS, cleanVoice, renderAnnouncement, renderSyllable, SYLLABLES } from "./voice.ts";
+import { ANNOUNCEMENTS, renderAnnouncement, renderSyllable, speedupVoice, SYLLABLES } from "./voice.ts";
 import { RECORDINGS } from "./recordings.gen.ts";
 import { SPEEDUP_EVERY } from "../core/difficulty.ts";
 import { parseRecordings, pickClip, speedupPhase, type VoiceClip } from "./voice-pool.ts";
@@ -110,7 +110,7 @@ export class AudioManager {
       try {
         const dec = await decodeBase64(ctx, clip.data);
         // natural, como foi gravada (a voz de monstro sujava e embolava o fim das falas; escolhido de ouvido no laboratório)
-        const buf = clip.raw ? await cleanVoice(dec, ctx.sampleRate, true) : dec;
+        const buf = clip.raw ? await speedupVoice(dec, ctx.sampleRate) : dec;
         if (token === this.voiceToken) this.nextVoice = { clip, buf };
         return;
       } catch {

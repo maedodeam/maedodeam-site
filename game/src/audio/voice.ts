@@ -567,6 +567,85 @@ export async function monsterize(input: AudioBuffer, sampleRate = 44100): Promis
  * Voz natural (como foi gravada): só tira o grave de microfone, compressão leve e, com `room`, uma sala curta e discreta.
  * Sem camadas mais graves, saturação nem eco. Normaliza o pico em `peak`.
  */
+/** Ajustes do tratamento das falas gravadas do SPEED UP. */
+export interface VoiceFx {
+  /** Mistura do reverb (0–1). */
+  wet: number;
+  /** Decay: a cauda cai 60 dB neste tempo (s). */
+  decay: number;
+  /** Pré-delay do reverb (s): preserva o ataque da voz. */
+  pre: number;
+  /** Corte de agudos da cauda (Hz). */
+  bright: number;
+  /** Compressão: limiar (dB) e razão. */
+  threshold: number;
+  ratio: number;
+}
+
+/** Tratamento publicado (opção "D" do laboratório): sala curta, pré-delay e compressão moderada para destacar a voz. */
+export const SPEEDUP_VOICE_FX: VoiceFx = { wet: 0.12, decay: 0.45, pre: 0.025, bright: 6000, threshold: -24, ratio: 4 };
+
+/** Cauda de reverb: ruído estéreo com queda exponencial de 60 dB em `seconds`. */
+export function decayIR(ctx: BaseAudioContext, seconds: number): AudioBuffer {
+  const len = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const b = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    let s = 2468 + ch * 1357;
+    for (let i = 0; i < len; i++) {
+      s = (s * 1664525 + 1013904223) >>> 0;
+      d[i] = (s / 2147483648 - 1) * Math.exp((-6.9 * i) / len);
+    }
+  }
+  return b;
+}
+
+/**
+ * Falas gravadas do SPEED UP: tira o grave de microfone, compressão moderada e reverb curto com pré-delay
+ * (a cauda sem grave e com agudos aparados). Sem camadas, saturação nem eco. Normaliza o pico em `peak`.
+ */
+export async function speedupVoice(input: AudioBuffer, sampleRate = 44100, fx: VoiceFx = SPEEDUP_VOICE_FX, peak = 0.9): Promise<AudioBuffer> {
+  const ctx = new OfflineAudioContext(2, Math.ceil((input.duration + fx.pre + fx.decay + 0.05) * sampleRate), sampleRate);
+  const s = ctx.createBufferSource();
+  s.buffer = input;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 90;
+  hp.Q.value = 0.7;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = fx.threshold;
+  comp.knee.value = 6;
+  comp.ratio.value = fx.ratio;
+  comp.attack.value = 0.006;
+  comp.release.value = 0.12;
+  s.connect(hp).connect(comp).connect(ctx.destination);
+  if (fx.wet > 0 && fx.decay > 0) {
+    const dl = ctx.createDelay(0.5);
+    dl.delayTime.value = fx.pre;
+    const conv = ctx.createConvolver();
+    conv.buffer = decayIR(ctx, fx.decay);
+    const lowCut = ctx.createBiquadFilter();
+    lowCut.type = "highpass";
+    lowCut.frequency.value = 200;
+    const highCut = ctx.createBiquadFilter();
+    highCut.type = "lowpass";
+    highCut.frequency.value = fx.bright;
+    const wet = ctx.createGain();
+    wet.gain.value = fx.wet;
+    comp.connect(dl).connect(conv).connect(lowCut).connect(highCut).connect(wet).connect(ctx.destination);
+  }
+  s.start(0);
+  const out = await ctx.startRendering();
+  let pk = 0;
+  for (let c = 0; c < out.numberOfChannels; c++) for (const v of out.getChannelData(c)) pk = Math.max(pk, Math.abs(v));
+  if (pk > 0) for (let c = 0; c < out.numberOfChannels; c++) {
+    const d = out.getChannelData(c);
+    for (let i = 0; i < d.length; i++) d[i] *= peak / pk;
+  }
+  return out;
+}
+
+/** Tratamento anterior (opção "B" do laboratório): compressão leve e sala curta. Fica para comparar. */
 export async function cleanVoice(input: AudioBuffer, sampleRate = 44100, room = true, peak = 0.9): Promise<AudioBuffer> {
   const tail = room ? 0.6 : 0.05;
   const ctx = new OfflineAudioContext(2, Math.ceil((input.duration + tail) * sampleRate), sampleRate);

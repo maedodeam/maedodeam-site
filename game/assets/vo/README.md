@@ -31,8 +31,9 @@ As 11 que precisaram de 1,8× a 2,2× de aceleração (`gogogo-2/3/4`, `mayhem-3
 
 Duas opções de arquivo (`.mp3`, `.ogg`, `.wav` ou `.m4a`):
 
-- **`<fala>.raw.mp3`** — a sua voz crua. O jogo aplica um tratamento natural (`cleanVoice`): corta o grave de
-  microfone, compressão leve e uma sala curta e discreta. A voz de monstro (`monsterize`: camadas mais graves,
+- **`<fala>.raw.mp3`** — a sua voz crua. O jogo aplica o tratamento `speedupVoice` (opção D do laboratório):
+  corta o grave de microfone, compressão moderada (-24 dB, 4:1) e reverb curto (decay 0,45 s, 12 %, pré-delay 25 ms);
+  durante a fala a trilha abaixa 4 dB (ducking). Os valores ficam em `SPEEDUP_VOICE_FX` (voice.ts). A voz de monstro (`monsterize`: camadas mais graves,
   saturação, eco e reverb longo) ficou só no laboratório: sujava e embolava o fim das falas (escolha de ouvido, nov/2026).
 - **`<fala>.mp3`** — já processada do jeito que você quiser; o jogo toca como está.
 
