@@ -81,9 +81,15 @@ test("bundle publicado (assets/play/game.js) não usa APIs proibidas nem endere�
 
 test("página do jogo só carrega arquivos locais", () => {
   const tpl = readFileSync(join(root, "src", "templates", "play.html"), "utf8");
-  const refs = [...tpl.matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
-  const external = refs.filter((r) => /^https?:|^\/\//.test(r));
-  assert.deepEqual(external, []);
+  const isExternal = (r: string) => /^https?:|^\/\//.test(r);
+  // tudo o que a página carrega (scripts, estilos, ícones, fontes, imagens) é local
+  const loaded = [...tpl.replace(/<a\b[^>]*>/g, "").matchAll(/(?:src|href)="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(loaded.filter(isExternal), []);
+  // links clicáveis para fora: só o crédito das vozes (RappaNui), em outra aba e sem dar acesso à página
+  const hrefOf = (a: string) => /href="([^"]+)"/.exec(a)?.[1] ?? "";
+  const out = [...tpl.matchAll(/<a\b[^>]*>/g)].map((m) => m[0]).filter((a) => isExternal(hrefOf(a)));
+  assert.deepEqual(out.map(hrefOf), ["https://www.instagram.com/rappanui/", "https://www.youtube.com/@RappaNuiBR"]);
+  for (const a of out) assert.match(a, /target="_blank" rel="noopener"/);
   assert.ok(!/serviceWorker|manifest\.json/.test(tpl));
 });
 

@@ -142,6 +142,11 @@ html:has(.mm-page) { height: 100%; overflow: hidden; }
 .mm-logo span:last-child { color: var(--accent); text-shadow: .045em .055em 0 var(--text); transform: rotate(-3deg); }
 .mm-logo i { font-style: normal; }
 .mm-controls { margin: 0; color: var(--muted); font-size: .9375rem; }
+/* crédito das vozes do SPEED UP */
+.mm-credit { margin: 0; color: var(--muted); font-family: var(--mono); font-size: .8125rem; letter-spacing: .04em; }
+.mm-credit strong { color: var(--text); font-weight: 700; }
+.mm-credit a { color: var(--accent); text-underline-offset: .2em; }
+.mm-credit a:hover, .mm-credit a:focus-visible { color: inherit; }
 .mm-foot {
   display: flex;
   flex-wrap: wrap;
