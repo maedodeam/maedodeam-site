@@ -45,6 +45,7 @@ const POINTER: Record<PointerHint, { mouse: Text; touch: Text }> = {
   hold: { mouse: { en: "HOLD CLICK", pt: "SEGURE O CLIQUE" }, touch: { en: "HOLD", pt: "SEGURE" } },
   swipe: { mouse: { en: "SWIPE", pt: "DESLIZE" }, touch: { en: "SWIPE", pt: "DESLIZE" } },
   move: { mouse: { en: "MOVE THE MOUSE", pt: "MEXA O MOUSE" }, touch: { en: "DRAG ANYWHERE", pt: "ARRASTE NA TELA" } },
+  goto: { mouse: { en: "CLICK WHERE TO GO", pt: "CLIQUE ONDE QUER IR" }, touch: { en: "DRAG ANYWHERE", pt: "ARRASTE NA TELA" } },
   none: { mouse: { en: "HANDS OFF", pt: "NÃO MEXE" }, touch: { en: "HANDS OFF", pt: "NÃO MEXE" } },
 };
 

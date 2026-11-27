@@ -2,12 +2,12 @@
 import type { Session } from "../core/session.ts";
 import { betweenTime, LIFE_POP_AT, SPEEDUP_TIME } from "../core/session.ts";
 import { INTRO_FREEZE } from "../core/runner.ts";
-import { START_LIVES } from "../core/difficulty.ts";
 import type { InputMode, Lang, Text } from "../core/types.ts";
 import { hintText, tr, UI } from "../core/i18n.ts";
 import { Gfx } from "../gfx/draw.ts";
 import { C } from "../gfx/palette.ts";
 import { heart, blob } from "../gfx/art.ts";
+import { bigRowFits, livesHud } from "./lives-layout.ts";
 import { psyColor } from "../gfx/wtf.ts";
 import type { Fit } from "../core/layout.ts";
 import type { MicrogameDef } from "../core/types.ts";
@@ -102,23 +102,30 @@ export class Renderer {
     const hr = t * 0.22;
     // vidas (a vida extra da transição de velocidade só aparece quando o coração surge na tela)
     const shown = s.lives - (s.phase === "speedup" && s.lifeBonus && s.phaseTime < LIFE_POP_AT ? 1 : 0);
-    for (let i = 0; i < START_LIVES; i++) {
-      const x = 16 + hr * 1.3 + i * hr * 2.8;
-      const alive = i < shown;
-      heart(g, x, t / 2 + 2, hr, alive ? C.orange : C.ink2, { stroke: alive ? C.ink : C.gray2, lw: 2.5 });
-    }
-    // número do microgame
-    const n = s.phase === "game" || s.phase === "between" ? s.played + 1 : s.played;
-    const lx = 16 + hr * 1.3 + START_LIVES * hr * 2.8 + 10;
-    g.text(`#${String(n).padStart(2, "0")}`, lx, t / 2 + 1, { size: t * 0.4, font: "mono", align: "left", color: C.paper });
     // pontos e velocidade (deixa espaço para os botões à direita)
     const right = v.vw - Math.min(200, v.vw * 0.4);
+    const scoreW = g.textWidth(`${s.score}`, { size: t * 0.42, font: "mono" });
+    const badgeW = s.tier > 1 ? g.textWidth(`×${s.tier}`, { size: t * 0.32, font: "mono" }) + 16 : 0;
     g.text(`${s.score}`, right, t / 2 + 1, { size: t * 0.42, font: "mono", align: "right", color: C.paper });
     if (s.tier > 1) {
-      const w = g.textWidth(`×${s.tier}`, { size: t * 0.32, font: "mono" }) + 16;
-      g.rect(right - g.textWidth(`${s.score}`, { size: t * 0.42, font: "mono" }) - w - 12, t / 2 - t * 0.22, w, t * 0.44, C.orange, { r: 6, stroke: null });
-      g.text(`×${s.tier}`, right - g.textWidth(`${s.score}`, { size: t * 0.42, font: "mono" }) - 12 - w / 2, t / 2 + 1, { size: t * 0.32, font: "mono", color: C.ink });
+      g.rect(right - scoreW - badgeW - 12, t / 2 - t * 0.22, badgeW, t * 0.44, C.orange, { r: 6, stroke: null });
+      g.text(`×${s.tier}`, right - scoreW - 12 - badgeW / 2, t / 2 + 1, { size: t * 0.32, font: "mono", color: C.ink });
     }
+    // vidas + número do microgame, no espaço que sobra à esquerda dos pontos
+    const n = s.phase === "game" || s.phase === "between" ? s.played + 1 : s.played;
+    const label = `#${String(n).padStart(2, "0")}`;
+    const lives = livesHud({ avail: right - scoreW - (badgeW ? badgeW + 12 : 0) - 14, hr, shown, label: g.textWidth(label, { size: t * 0.4, font: "mono" }), count: (k) => g.textWidth(`×${k}`, { size: t * 0.4, font: "mono" }) });
+    const x0 = 16 + hr * 1.3;
+    if (lives.mode === "hearts") {
+      for (let i = 0; i < lives.slots; i++) {
+        const alive = i < shown;
+        heart(g, x0 + i * hr * 2.8, t / 2 + 2, hr, alive ? C.orange : C.ink2, { stroke: alive ? C.ink : C.gray2, lw: 2.5 });
+      }
+    } else {
+      heart(g, x0, t / 2 + 2, hr, shown > 0 ? C.orange : C.ink2, { stroke: shown > 0 ? C.ink : C.gray2, lw: 2.5 });
+      g.text(`×${shown}`, x0 + hr * 1.4, t / 2 + 1, { size: t * 0.4, font: "mono", align: "left", color: C.paper });
+    }
+    if (lives.labelX !== null) g.text(label, lives.labelX, t / 2 + 1, { size: t * 0.4, font: "mono", align: "left", color: C.paper });
 
     // pavio do tempo
     const r = s.runner;
@@ -237,17 +244,36 @@ export class Renderer {
     // vidas grandes; a que acabou de ser perdida quebra
     const hr = Math.min(g.w, g.h) * 0.055;
     const lost = s.lastResult === "lose" && s.livesBefore > s.lives;
-    for (let i = 0; i < START_LIVES; i++) {
-      const x = g.w / 2 + (i - (START_LIVES - 1) / 2) * hr * 3;
-      const y = g.h * (portrait ? 0.62 : 0.7);
-      const alive = i < s.lives;
-      const breaking = lost && i === s.lives && t < 0.5;
-      g.push();
-      g.translate(x, y + (breaking ? t * 120 : 0));
-      if (breaking) g.rotate(t * 1.5);
-      heart(g, 0, 0, hr, alive ? C.orange : breaking ? C.red : C.ink2, { stroke: alive || breaking ? C.ink : C.gray2, lw: 6 });
-      if (!alive && !breaking) g.line(-hr * 0.6, -hr * 0.6, hr * 0.6, hr * 0.6, C.gray2, 6);
-      g.pop();
+    const y = g.h * (portrait ? 0.62 : 0.7);
+    const row = bigRowFits(g.w, hr, s.lives);
+    if (row.fits) {
+      for (let i = 0; i < row.slots; i++) {
+        const x = g.w / 2 + (i - (row.slots - 1) / 2) * hr * 3;
+        const alive = i < s.lives;
+        const breaking = lost && i === s.lives && t < 0.5;
+        g.push();
+        g.translate(x, y + (breaking ? t * 120 : 0));
+        if (breaking) g.rotate(t * 1.5);
+        heart(g, 0, 0, hr, alive ? C.orange : breaking ? C.red : C.ink2, { stroke: alive || breaking ? C.ink : C.gray2, lw: 6 });
+        if (!alive && !breaking) g.line(-hr * 0.6, -hr * 0.6, hr * 0.6, hr * 0.6, C.gray2, 6);
+        g.pop();
+      }
+    } else {
+      // muitas vidas: um coração grande com "×N" (e o que acabou de ser perdido caindo ao lado)
+      const text = `×${s.lives}`;
+      const ts = hr * 1.5;
+      const tw = g.textWidth(text, { size: ts, font: "mono" });
+      const total = hr * 2.6 + tw;
+      const hx = g.w / 2 - total / 2 + hr;
+      heart(g, hx, y, hr, C.orange, { stroke: C.ink, lw: 6 });
+      g.text(text, hx + hr * 1.6, y + ts * 0.05, { size: ts, font: "mono", align: "left", color: C.paper, stroke: C.ink, lw: ts * 0.12 });
+      if (lost && t < 0.5) {
+        g.push();
+        g.translate(hx - hr * 2.4, y + t * 120);
+        g.rotate(t * 1.5);
+        heart(g, 0, 0, hr * 0.8, C.red, { stroke: C.ink, lw: 6 });
+        g.pop();
+      }
     }
 
     // mascote reage ao resultado anterior

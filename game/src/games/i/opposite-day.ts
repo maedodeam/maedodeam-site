@@ -32,7 +32,11 @@ function setup(api: MicroAPI): MicroInstance {
   const { w, h, rng } = api;
   const lv = Math.min(api.level, 1.5);
   const portrait = isPortrait(api);
-  const n = lv < 0.5 ? 4 : lv < 1 ? 5 : 6;
+  // cada passo tem tempo de sobra para ler a seta e pensar no contrário (1,3 s no começo, 1 s no fim); cabem quantos
+  // passos o tempo do microgame deixar, de 3 a 5
+  const P = 1.3 - 0.2 * lv;
+  const t0 = 0.6;
+  const n = Math.max(3, Math.min(lv < 0.5 ? 4 : 5, Math.floor((api.duration - t0 - 0.25) / P)));
   const dirs: Dir[] = [];
   for (let i = 0; i < n; i++) {
     let d = rng.pick(ALL);
@@ -44,8 +48,8 @@ function setup(api: MicroAPI): MicroInstance {
     dirs,
     done: dirs.map(() => false),
     n,
-    t0: 0.6,
-    P: lv < 0.5 ? 1.0 : 1.0 - lv * 0.25,
+    t0,
+    P,
     ok: 0,
     fail: "",
     failAt: 0,
@@ -202,11 +206,11 @@ export const oppositeDay: Entry<S> = {
     difficulty: 2,
     wtf: "insane",
     mechanic:
-      "A disco boss on a flashing psychedelic dance floor shows a dance move as a big arrow on every beat. Swipe (or press the arrow) the OPPOSITE way before the next beat: left for right, up for down. Win with 4 moves (5 to 6 later, on a faster beat).",
+      "A disco boss on a flashing psychedelic dance floor shows a dance move as a big arrow on every beat. Swipe (or press the arrow) the OPPOSITE way before the next beat: left for right, up for down. Each beat gives about a second to think (1.3 s at first, 1 s at the hardest). Win with 4 moves (5 later, on a slightly faster beat; fewer if the time is short).",
     winText: "Do the opposite of every move, on the beat.",
     loseText: "Copy the boss's direction, go any other wrong way, or miss a beat.",
     timeScale: 1.8,
-    minTime: 4.8,
+    minTime: 5.6,
     bg: BG.purple,
     setup,
   },

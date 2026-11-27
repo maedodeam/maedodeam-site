@@ -1,4 +1,5 @@
-// 042 · WHERE? — cartas mostram objetos por um instante e viram. Aparece um objeto: toque na carta onde ele estava.
+// 042 · MEMORIZE! — cartas mostram objetos por um instante ("DECORA!") e viram. Aí vem a pergunta "ONDE ESTAVA?"
+// com um objeto: toque na carta onde ele estava.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -48,7 +49,8 @@ function setup(api: MicroAPI): MicroInstance {
   const cells: Rect[] = [];
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ x: x0 + c * cell, y: y0 + r * cell, w: cell, h: cell });
   const items = rng.shuffle(SYMBOLS).slice(0, n);
-  const panel = wide ? { x: w * 0.82, y: h / 2, s: Math.min(260, w * 0.15) } : { x: w / 2, y: area.y / 2 + 10, s: Math.min(200, area.y * 0.38) };
+  // Fora do modo largo, o painel fica à direita da faixa de cima e a pergunta à esquerda dele.
+  const panel = wide ? { x: w * 0.82, y: h / 2, s: Math.min(260, w * 0.15) } : { x: w * 0.76, y: area.y / 2 + 10, s: Math.min(200, area.y * 0.38) };
   const s: S = {
     items,
     cells,
@@ -135,15 +137,39 @@ function setup(api: MicroAPI): MicroInstance {
         }
         g.pop();
       }
+      // instrução em dois passos: primeiro DECORA (cartas abertas), depois a pergunta (cartas viradas)
+      const p = s.panel;
+      const wide = w > h * 1.2;
+      if (s.phase !== "ask") {
+        const tx = wide ? p.x : w / 2;
+        const ty = p.y;
+        const fade = s.phase === "flip" ? 1 - s.t / FLIP : 1;
+        g.push();
+        g.alpha(Math.max(0, fade));
+        const pulse = 1 + Math.sin(s.t * 14) * 0.04;
+        g.push();
+        g.translate(tx, ty);
+        g.scale(pulse);
+        g.text(api.t({ en: "MEMORIZE!", pt: "DECORA!" }), 0, 0, { size: wide ? 120 : 110, color: C.yellow, stroke: C.ink, lw: 14, maxWidth: wide ? w * 0.3 : w - 120 });
+        g.pop();
+        // barra do tempo até as cartas virarem
+        const bw = wide ? w * 0.26 : Math.min(520, w * 0.5);
+        const left = s.phase === "show" ? 1 - s.t / s.showT : 0;
+        g.rect(tx - bw / 2, ty + 80, bw, 26, C.ink2, { r: 13, lw: 5 });
+        if (left > 0.02) g.rect(tx - bw / 2, ty + 80, bw * left, 26, C.yellow, { r: 13, stroke: null });
+        g.pop();
+      }
       // painel do alvo
       if (s.phase === "ask") {
-        const p = s.panel;
+        const q = api.t({ en: "WHERE WAS IT?", pt: "ONDE ESTAVA?" });
         const pop = Math.min(1, s.t / 0.15);
         const sz = p.s * (0.6 + pop * 0.4);
         g.rect(p.x - sz * 0.75 + 8, p.y - sz * 0.75 + 12, sz * 1.5, sz * 1.5, C.ink, { r: 28, stroke: null });
         g.rect(p.x - sz * 0.75, p.y - sz * 0.75, sz * 1.5, sz * 1.5, C.yellow, { r: 28, lw: 9 });
         drawProp(g, s.items[s.target], p.x, p.y, sz * 1.1);
         g.text("?", p.x + sz * 0.75, p.y - sz * 0.75, { size: 90, color: C.white, stroke: C.ink, lw: 12 });
+        if (wide) g.text(q, p.x, p.y - p.s * 0.75 - 70, { size: 84, color: C.white, stroke: C.ink, lw: 12, maxWidth: w * 0.3 });
+        else g.text(q, w * 0.33, p.y, { size: 84, color: C.white, stroke: C.ink, lw: 12, maxWidth: w * 0.5 });
       }
     },
   };
@@ -154,13 +180,13 @@ export const whereWas: Entry<S> = {
     id: "where-was",
     num: 42,
     name: { en: "Where Was It?", pt: "Onde Estava?" },
-    verb: { en: "WHERE?", pt: "ONDE?" },
+    verb: { en: "MEMORIZE!", pt: "DECORA!" },
     hint: { pointer: "tap" },
     category: "memory",
     family: "tap",
     goal: "complete",
     difficulty: 2,
-    mechanic: "A grid of 6 to 9 cards shows objects for about a second, then flips face down. One object is shown: tap the card where it was.",
+    mechanic: "A grid of 6 to 9 cards shows objects for about a second (MEMORIZE!), then flips face down. Then the question WHERE WAS IT? shows one object: tap the card where it was.",
     winText: "Tap the card that hid the object.",
     loseText: "Tap another card, or time runs out.",
     timeScale: 1.4,

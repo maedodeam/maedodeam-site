@@ -3,8 +3,9 @@
 //   title → between → game → (between | speedup → between)… → over → (start de novo)
 //
 // A cada 10 microgames concluídos (vencidos ou não), quem ainda está vivo passa pela transição de velocidade
-// e recupera 1 vida, até o máximo de START_LIVES. A vida chega junto com o "SPEED UP!", sem tirar tempo de
-// nenhum microgame, e cada marco (10, 20, 30…) só pode dar vida uma vez.
+// e ganha 1 vida se estiver abaixo de START_LIVES (recuperação) ou se passou os 10 sem perder nenhum (bônus:
+// aí pode passar de START_LIVES, e vai acumulando: 5, 6, 7…). A vida chega junto com o "SPEED UP!", sem tirar
+// tempo de nenhum microgame, e cada marco (10, 20, 30…) só pode dar uma vida.
 //
 // Nada daqui é salvo: a partida vive só na memória e some ao recarregar a página.
 import { durationFor, levelFor, pointsFor, SPEEDUP_EVERY, START_LIVES, tierOf } from "./difficulty.ts";
@@ -70,6 +71,8 @@ export class Session {
   lifeBonus = false;
   /** Último marco (10, 20, 30…) que já foi processado: nunca dá vida duas vezes no mesmo. */
   private lastMilestone = 0;
+  /** Perdeu algum microgame desde o último marco de 10? (sem perder nenhum = vida extra, mesmo acima de START_LIVES) */
+  private lostSinceMilestone = false;
   readonly catalogSize: number;
   lang: Lang;
 
@@ -107,6 +110,7 @@ export class Session {
     this.overEmitted = false;
     this.lifeBonus = false;
     this.lastMilestone = 0;
+    this.lostSinceMilestone = false;
     this.seq = new Sequencer(this.o.catalog, this.rng.fork());
     this.emit({ type: "start" });
     this.enter("between");
@@ -190,6 +194,7 @@ export class Session {
       this.score += points;
     } else {
       this.lives = Math.max(0, this.lives - 1);
+      this.lostSinceMilestone = true;
       if (this.lives === 0) this.lostTo = r.def;
     }
     this.lastPoints = points;
@@ -213,11 +218,16 @@ export class Session {
     this.enter("between");
   }
 
-  /** +1 vida no marco `played` (10, 20, 30…), se ainda houver espaço e o marco não tiver sido usado. */
+  /**
+   * +1 vida no marco `played` (10, 20, 30…), uma vez por marco: se estiver abaixo de START_LIVES, ou se os 10
+   * microgames desde o marco anterior foram todos vencidos (então acumula acima de START_LIVES, sem teto).
+   */
   private grantMilestoneLife(played: number): boolean {
     if (played <= this.lastMilestone || this.lives <= 0) return false;
     this.lastMilestone = played;
-    if (this.lives >= START_LIVES) return false;
+    const flawless = !this.lostSinceMilestone;
+    this.lostSinceMilestone = false;
+    if (this.lives >= START_LIVES && !flawless) return false;
     this.lives++;
     return true;
   }

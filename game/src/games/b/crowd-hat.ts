@@ -1,4 +1,5 @@
 // 022 · FIND HIM! — o saguão está lotado; o estagiário é o único de boné laranja (com estrela). Toque nele.
+// O crachá no canto mostra o estagiário exatamente como ele está na multidão (mesmos dados de aparência).
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -29,10 +30,16 @@ interface S {
   t: number;
 }
 
-const SHIRTS = [C.blue, C.green, C.purple, C.teal, C.pink, C.white, C.yellow, C.gray, C.red, C.sky];
+const SHIRTS: string[] = [C.blue, C.green, C.purple, C.teal, C.pink, C.white, C.yellow, C.gray, C.red, C.sky];
 const HAIRS = [C.ink2, C.brown, C.yellow, C.gray2, C.orange2];
 const SKINS = [C.skin, C.skin2, "#8a5a3c", "#f6d5b8"];
 const DECOY_HATS = [C.blue, C.green, C.purple, C.red, C.white, C.ink2];
+const INTERN_HAT: NonNullable<Hat> = { kind: "cap", color: C.orange, star: true };
+
+/** A aparência de uma pessoa. O crachá e a multidão desenham o estagiário a partir destes mesmos dados. */
+function looks(p: Walker): { shirt: string; hair: string; skin: string; glasses: boolean; tie: null; hat: null } {
+  return { shirt: p.shirt, hair: p.hair, skin: p.skin, glasses: p.glasses, tie: null, hat: null };
+}
 
 /** Caixa de toque de uma pessoa (pés em x,y). */
 function body(p: Walker, sc: number): { cx: number; cy: number; hw: number; hh: number } {
@@ -70,11 +77,14 @@ function setup(api: MicroAPI): MicroInstance {
   const floor = { x0: 90, x1: w - 90, y0: h * (portrait ? 0.3 : 0.36), y1: h - 50 };
   const speed = 80 + k * 110;
   const people: Walker[] = [];
+  const intern = rng.int(0, n - 1);
   for (let i = 0; i < n; i++) {
     const a = rng.range(0, Math.PI * 2);
     const sp = speed * rng.range(0.6, 1.2);
     let hat: Hat = null;
-    if (lv >= 0.5 && rng.chance(0.3 + k * 0.5)) {
+    if (i === intern) hat = INTERN_HAT;
+    else if (lv >= 0.5 && rng.chance(0.3 + k * 0.5)) {
+      // os bonés dos outros nunca são laranja nem têm estrela
       const kind = rng.pick(["cap", "cap", "beanie", "top"] as const);
       hat = { kind, color: rng.pick(DECOY_HATS), star: false };
     }
@@ -91,8 +101,14 @@ function setup(api: MicroAPI): MicroInstance {
       phase: rng.range(0, 1),
     });
   }
-  const intern = rng.int(0, n - 1);
-  people[intern].hat = { kind: "cap", color: C.orange, star: true };
+  // Ninguém na multidão é sósia do estagiário: quem tiver a mesma roupa, cabelo, pele e óculos troca de camisa.
+  const it = people[intern];
+  for (const p of people) {
+    if (p === it) continue;
+    if (p.shirt === it.shirt && p.hair === it.hair && p.skin === it.skin && p.glasses === it.glasses) {
+      p.shirt = SHIRTS[(SHIRTS.indexOf(p.shirt) + 1 + rng.int(0, SHIRTS.length - 2)) % SHIRTS.length];
+    }
+  }
   // o estagiário nunca começa embaixo do retrato
   const s: S = { people, intern, sc, floor, picked: -1, after: 0, t: 0 };
 
@@ -174,13 +190,8 @@ function setup(api: MicroAPI): MicroInstance {
         g.shadow(p.x, p.y, 46 * sc * 1.6);
         const walking = !api.result;
         person(g, p.x, y, sc, {
-          shirt: p.shirt,
-          hair: p.hair,
-          skin: p.skin,
-          tie: null,
+          ...looks(p),
           mood,
-          glasses: p.glasses,
-          hat: null,
           walk: walking ? p.phase : undefined,
           look: { x: Math.sign(p.vx) * 0.8, y: 0 },
         });
@@ -201,8 +212,10 @@ function setup(api: MicroAPI): MicroInstance {
       g.clip(cx + 14, cy + 14, cw - 28, ch * 0.66, 10);
       g.rect(cx, cy, cw, ch, C.sky, { stroke: null });
       const ps = cw / 260;
-      person(g, cx + cw / 2, cy + ch * 0.66 + 140 * ps, ps * 1.15, { shirt: C.white, tie: C.orange, mood: "happy", hair: C.ink2, hat: null });
-      drawHat(g, cx + cw / 2, cy + ch * 0.66 + 140 * ps - 178 * ps * 1.15, ps * 1.15, { kind: "cap", color: C.orange, star: true }, 1);
+      // a foto do crachá usa a aparência sorteada do próprio estagiário (camisa, cabelo, pele, óculos, boné)
+      const me = s.people[s.intern];
+      person(g, cx + cw / 2, cy + ch * 0.66 + 140 * ps, ps * 1.15, { ...looks(me), mood: "happy" });
+      if (me.hat) drawHat(g, cx + cw / 2, cy + ch * 0.66 + 140 * ps - 178 * ps * 1.15, ps * 1.15, me.hat, 1);
       g.pop();
       g.rect(cx + 14, cy + 14, cw - 28, ch * 0.66, null, { r: 10, lw: 5 });
       g.text(api.t({ en: "INTERN", pt: "ESTAGIÁRIO" }), cx + cw / 2, cy + ch * 0.83, { size: 44 + big * 20, color: C.ink, maxWidth: cw - 30 });

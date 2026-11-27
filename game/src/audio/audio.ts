@@ -3,8 +3,10 @@
 // O contexto de áudio só é criado depois de um gesto do jogador (exigência dos navegadores).
 import type { SfxName } from "../core/types.ts";
 import { MusicEngine } from "./music.ts";
-import { ANNOUNCEMENTS, monsterize, renderAnnouncement, renderSyllable, SYLLABLES } from "./voice.ts";
+import { ANNOUNCEMENTS, renderAnnouncement, renderSyllable, speedupVoice, SYLLABLES } from "./voice.ts";
 import { RECORDINGS } from "./recordings.gen.ts";
+import { SPEEDUP_EVERY } from "../core/difficulty.ts";
+import { parseRecordings, pickClip, speedupPhase, type VoiceClip } from "./voice-pool.ts";
 
 const NOTE = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -20,6 +22,11 @@ export class AudioManager {
   voicesReady = false;
   /** Origem de cada anúncio: "recording" (arquivo gravado) ou "synth". */
   readonly voiceSource = new Map<string, "recording" | "synth">();
+  /** Falas gravadas (ver voice-pool.ts). Só a próxima fica decodificada e processada, para poupar memória. */
+  private clips: VoiceClip[] = [];
+  private nextVoice: { clip: VoiceClip; buf: AudioBuffer } | null = null;
+  private recentVoices: string[] = [];
+  private voiceToken = 0;
 
   /** Cria/retoma o contexto. Chamar dentro de um gesto do jogador (clique em PLAY). */
   unlock(): void {
@@ -70,32 +77,45 @@ export class AudioManager {
       for (const id of Object.keys(SYLLABLES)) {
         this.chops.set(id, await renderSyllable(id, ctx.sampleRate));
       }
-      // Falas gravadas têm prioridade: "<id>" já pronta, "<id>.raw" recebe a cadeia de monstro.
-      const recorded: string[] = [];
-      for (const [name, rec] of Object.entries(RECORDINGS)) {
-        try {
-          const raw = name.endsWith(".raw");
-          const id = raw ? name.slice(0, -4) : name;
-          const buf = await decodeBase64(ctx, rec);
-          music.announcements.set(id, raw ? await monsterize(buf, ctx.sampleRate) : buf);
-          this.voiceSource.set(id, "recording");
-          recorded.push(id);
-        } catch {
-          /* gravação ilegível: ignorada */
-        }
-      }
-      // Sem gravações: rugidos sintetizados, sem palavras (a palavra aparece na tela).
-      const order = recorded.length ? recorded : Object.keys(ANNOUNCEMENTS);
-      if (!recorded.length) {
+      // Falas gravadas têm prioridade (sorteadas por fase; "<id>.raw" recebe o tratamento natural com sala curta).
+      this.clips = parseRecordings(RECORDINGS);
+      for (const c of this.clips) this.voiceSource.set(c.id, "recording");
+      if (this.clips.length) {
+        await this.prepareVoice(SPEEDUP_EVERY);
+      } else {
+        // Sem gravações: rugidos sintetizados, sem palavras (a palavra aparece na tela).
+        const order = Object.keys(ANNOUNCEMENTS);
         for (const id of order) {
           music.announcements.set(id, await renderAnnouncement(id, ctx.sampleRate));
           this.voiceSource.set(id, "synth");
         }
+        music.setAnnouncements(order.sort(() => 0.5 - Math.random()));
       }
-      music.setAnnouncements(order.sort(() => 0.5 - Math.random()));
       this.voicesReady = true;
     } catch {
       this.voicesReady = false;
+    }
+  }
+
+  /** Sorteia e deixa pronta (decodificada e, se crua, com o tratamento natural) a fala da aceleração da fase `phase`. */
+  private async prepareVoice(phase: number): Promise<void> {
+    const ctx = this.ctx;
+    if (!ctx || !this.clips.length) return;
+    const token = ++this.voiceToken;
+    this.nextVoice = null;
+    // até 3 tentativas: uma gravação ilegível é descartada e outra é sorteada
+    for (let i = 0; i < 3; i++) {
+      const clip = pickClip(this.clips, phase, this.recentVoices);
+      if (!clip) return;
+      try {
+        const dec = await decodeBase64(ctx, clip.data);
+        // natural, como foi gravada (a voz de monstro sujava e embolava o fim das falas; escolhido de ouvido no laboratório)
+        const buf = clip.raw ? await speedupVoice(dec, ctx.sampleRate) : dec;
+        if (token === this.voiceToken) this.nextVoice = { clip, buf };
+        return;
+      } catch {
+        this.clips = this.clips.filter((c) => c !== clip);
+      }
     }
   }
 
@@ -129,6 +149,8 @@ export class AudioManager {
     if (!this.music) return;
     this.music.start("game", 1);
     this.music.stinger("start");
+    // partida nova: a próxima aceleração é a da fase 10 (a fala pronta pode ser de um grupo que só vale depois)
+    if (this.clips.length && this.voicesReady && (!this.nextVoice || this.nextVoice.clip.from > SPEEDUP_EVERY)) void this.prepareVoice(SPEEDUP_EVERY);
   }
 
   result(win: boolean): void {
@@ -137,7 +159,16 @@ export class AudioManager {
   }
 
   speedup(tier: number, duration: number): void {
-    this.music?.speedup(tier, duration);
+    if (!this.music) return;
+    if (!this.clips.length) {
+      this.music.speedup(tier, duration);
+      return;
+    }
+    const phase = speedupPhase(tier);
+    const v = this.nextVoice && this.nextVoice.clip.from <= phase ? this.nextVoice : null;
+    this.music.speedup(tier, duration, v ? v.buf : null);
+    if (v) this.recentVoices = [...this.recentVoices, v.clip.id].slice(-12);
+    void this.prepareVoice(phase + SPEEDUP_EVERY);
   }
 
   gameOver(): void {

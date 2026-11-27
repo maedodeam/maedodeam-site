@@ -33,7 +33,7 @@ FORBIDDEN_GAME_APIS = ["localStorage", "sessionStorage", "indexedDB", "document.
                        "sendBeacon", "XMLHttpRequest", "WebSocket", "fetch(", "caches."]
 # Com telemetria ligada (CSP do jogo libera um endereço em connect-src), o jogo pode usar só estas duas, e só para ele.
 TELEMETRY_APIS = {"sendBeacon", "fetch("}
-FORBIDDEN_NAMES = {"package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".nojekyll", "gallery.html", "gallery.js"}
+FORBIDDEN_NAMES = {"package.json", "package-lock.json", "tsconfig.json", ".gitignore", ".nojekyll", "gallery.html", "gallery.js", "music-lab.js"}
 
 
 def collect() -> list[Path]:

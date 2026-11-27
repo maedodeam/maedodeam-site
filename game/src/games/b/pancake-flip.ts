@@ -1,4 +1,4 @@
-// 039 · FLIP! — a panqueca doura na frigideira: deslize para cima (ou Espaço) para virar quando estiver DOURADA.
+// 039 · FLIP! — a panqueca doura na frigideira: toque, deslize para qualquer lado (ou Espaço) para virar quando estiver DOURADA.
 // Cedo demais = crua; tarde demais = queimada. No nível alto, os dois lados.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
@@ -87,7 +87,10 @@ function setup(api: MicroAPI): MicroInstance {
         return;
       }
       const inp = api.input;
-      const flip = inp.swipe === "up" || inp.keyPressed("action");
+      // Qualquer gesto vira: toque/clique, deslizar para qualquer lado (todo deslize começa com um toque),
+      // Espaço/Enter ou qualquer seta. Vira no instante do toque, que é o que conta num jogo de tempo.
+      const flip =
+        inp.actionPressed || inp.keyPressed("up") || inp.keyPressed("down") || inp.keyPressed("left") || inp.keyPressed("right");
       if (!flip) return;
       if (s.p < s.a) {
         s.fail = "raw";
@@ -228,12 +231,12 @@ export const pancakeFlip: Entry<S> = {
     num: 39,
     name: { en: "Pancake Flip", pt: "Vira a Panqueca" },
     verb: { en: "FLIP!", pt: "VIRA!" },
-    hint: { pointer: "swipe", keys: "space" },
+    hint: { pointer: "tap", keys: "space" },
     category: "timing",
-    family: "swipe",
+    family: "action",
     goal: "complete",
     difficulty: 2,
-    mechanic: "A pancake browns in the pan (a gauge shows the golden zone). Swipe up or press Space to flip it while golden. Too early: raw; too late: burnt. Later both sides must be flipped.",
+    mechanic: "A pancake browns in the pan (a gauge shows the golden zone). Tap, swipe any way or press Space to flip it while golden. Too early: raw; too late: burnt. Later both sides must be flipped.",
     winText: "Flip every side while it is golden.",
     loseText: "Flip it raw or burnt, or let it burn.",
     timeScale: 1.4,
@@ -251,11 +254,11 @@ export const pancakeFlip: Entry<S> = {
           const x = api.w / 2;
           const y = api.h * 0.75;
           if (!io.isDown) {
-            // aperta um quadro antes do meio da janela; solta no quadro seguinte, deslizando para cima
+            // aperta um quadro antes do meio da janela (o toque já vira); solta no quadro seguinte, deslizando de lado
             if (s.p + dt / s.T >= (s.a + s.b) / 2) io.down(x, y);
           } else {
-            io.move(x, y - 120);
-            io.up(x, y - 240);
+            io.move(x + 120, y);
+            io.up(x + 240, y);
           }
         },
         lose(s, api, io) {

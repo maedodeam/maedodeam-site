@@ -1,5 +1,7 @@
 // 100 · SAVE! — pênalti no corredor do escritório. Você é o goleiro. O colega corre e chuta; leia a direção
-// (olhar e corpo dele) e pule para a esquerda, a direita ou para cima antes de a bola chegar. Depois, ele finta.
+// (olhar e corpo dele, e a linha pontilhada com a mira) e pule para a esquerda, a direita ou para cima antes de a
+// bola chegar. Depois, ele finta: a mira fica solta (amarela, girando) mirando o lado falso e trava (vermelha) no lado
+// de verdade quando ele se decide.
 import type { Dir, Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -30,7 +32,31 @@ interface S {
 function spot(s: S, side: Side): { x: number; y: number } {
   if (side === "left") return { x: s.gx - s.goalW * 0.34, y: s.lineY - (s.lineY - s.barY) * 0.4 };
   if (side === "right") return { x: s.gx + s.goalW * 0.34, y: s.lineY - (s.lineY - s.barY) * 0.4 };
-  return { x: s.gx, y: s.barY + 90 };
+  return { x: s.gx, y: s.barY + 45 }; // alto, perto do travessão: a mira não fica em cima das cabeças
+}
+
+/** Posição da bola no voo (k = 0..1): reta até o alvo com um arco para cima. */
+function flightAt(from: { x: number; y: number }, to: { x: number; y: number }, k: number): { x: number; y: number } {
+  return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k - Math.sin(k * Math.PI) * 80 };
+}
+
+/** Mira: solta = amarela girando (ainda pode mudar); travada = vermelha, firme. */
+function crosshair(g: Gfx, x: number, y: number, r: number, locked: boolean, spin: number): void {
+  const col = locked ? C.red : C.yellow;
+  g.push();
+  g.translate(x, y);
+  if (!locked) g.rotate(spin);
+  g.circle(0, 0, r, null, { stroke: C.ink, lw: 16 });
+  g.circle(0, 0, r, null, { stroke: col, lw: 8 });
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2;
+    const c = Math.cos(a);
+    const sn = Math.sin(a);
+    g.line(c * (r - 16), sn * (r - 16), c * (r + 22), sn * (r + 22), C.ink, 16);
+    g.line(c * (r - 16), sn * (r - 16), c * (r + 22), sn * (r + 22), col, 8);
+  }
+  g.circle(0, 0, 9, col, { stroke: C.ink, lw: 5 });
+  g.pop();
 }
 
 function setup(api: MicroAPI): MicroInstance {
@@ -157,7 +183,8 @@ function setup(api: MicroAPI): MicroInstance {
       const look = showDir === "left" ? { x: -1, y: 0.2 } : showDir === "right" ? { x: 1, y: 0.2 } : { x: 0, y: -1 };
       const lean = showDir === "left" ? -0.3 : showDir === "right" ? 0.3 : -0.05;
       const ksc = 1.1 + run * 0.35;
-      const kx = s.kx - 90 + run * 60;
+      // o cobrador fica à esquerda da bola: a linha "para cima" não passa por cima do corpo dele
+      const kx = s.kx - 150 + run * 40;
       const ky = s.ky + run * 70;
       // bola parada antes do chute
       const ballStart = { x: s.kx, y: ky + 6 };
@@ -171,14 +198,6 @@ function setup(api: MicroAPI): MicroInstance {
       for (const ex of [-17, 17]) g.eye(ex, -178 + 4, 15, look.x, look.y);
       g.pop();
       if (s.fake && s.t >= s.switchAt && s.t < s.switchAt + 0.3 && !kicked) g.text("!", kx, ky - 330 * ksc, { size: 90, color: C.yellow, stroke: C.ink, lw: 12 });
-      // linha de mira (só no nível baixo)
-      if (api.level < 0.5 && !kicked) {
-        const p = spot(s, s.target);
-        g.push();
-        g.alpha(0.5);
-        g.dashed(ballStart.x, ballStart.y, p.x, p.y, C.white, 8, 22);
-        g.pop();
-      }
 
       // bola
       let bx = ballStart.x;
@@ -189,8 +208,9 @@ function setup(api: MicroAPI): MicroInstance {
         const p = spot(s, s.target);
         const stop = s.saved === true ? 0.98 : 1.08;
         const kk = Math.min(k, stop);
-        bx = ballStart.x + (p.x - ballStart.x) * kk;
-        by = ballStart.y + (p.y - ballStart.y) * kk - Math.sin(kk * Math.PI) * 80;
+        const q = flightAt(ballStart, p, kk);
+        bx = q.x;
+        by = q.y;
         br = 26 + kk * 34;
         if (api.result === "win") {
           bx = p.x;
@@ -248,6 +268,35 @@ function setup(api: MicroAPI): MicroInstance {
         }
         bodyDrawn();
       }
+      // trajetória pontilhada + mira, por cima de tudo (o goleiro e o cobrador não escondem o "para cima").
+      // Segue a mira atual do cobrador: na finta aponta o lado falso (mira solta) e muda para o lado de verdade
+      // quando ele se decide (mira trava, com um pulso).
+      if (!api.result) {
+        const aim: Side = kicked ? s.target : showDir;
+        const locked = kicked || !s.fake || s.t >= s.switchAt;
+        const p = spot(s, aim);
+        const k0 = kicked ? Math.min(1, (s.t - s.kickAt) / s.flight) : 0;
+        const N = 16;
+        g.push();
+        g.alpha(locked ? 0.95 : 0.7);
+        for (let i = 1; i < N; i++) {
+          const k = i / N;
+          if (k <= k0 + 0.03) continue;
+          const q = flightAt(ballStart, p, k);
+          g.circle(q.x, q.y, 7 + k * 7, locked ? C.white : C.paper2, { stroke: C.ink, lw: 4 });
+        }
+        g.pop();
+        const cr = portrait ? 62 : 56;
+        crosshair(g, p.x, p.y, cr, locked, s.t * 2.5);
+        const since = s.fake ? s.t - s.switchAt : s.t;
+        if (locked && since >= 0 && since < 0.35) {
+          const e = since / 0.35;
+          g.push();
+          g.alpha(1 - e);
+          g.circle(p.x, p.y, cr * (1 + e * 1.2), null, { stroke: C.red, lw: 10 });
+          g.pop();
+        }
+      }
       if (api.result === "win") g.text(api.t({ en: "SAVED!", pt: "DEFENDEU!" }), w / 2, portrait ? h * 0.2 : h * 0.16, { size: 120, color: C.green, stroke: C.ink, lw: 16 });
       if (api.result === "lose") g.text(api.t({ en: "GOOOAL…", pt: "GOOOL…" }), w / 2, portrait ? h * 0.2 : h * 0.16, { size: 120, color: C.red, stroke: C.ink, lw: 16 });
     },
@@ -268,7 +317,7 @@ export const goalDive: Entry<S> = {
     goal: "complete",
     difficulty: 2,
     mechanic:
-      "Hallway football: you are the goalkeeper. A coworker runs up and kicks; his gaze and lean show where. Swipe (or press an arrow, or tap the left, middle or right of the screen) to dive left, right or up before the ball arrives. Later he fakes one way first, then looks the real way just before kicking.",
+      "Hallway football: you are the goalkeeper. A coworker runs up and kicks; his gaze, his lean and a dotted line ending in a crosshair show where. Swipe (or press an arrow, or tap the left, middle or right of the screen) to dive left, right or up before the ball arrives. Later he fakes one way first (loose yellow crosshair), then commits to the real side just before kicking (the crosshair moves there and locks red).",
     winText: "Dive to the side the ball goes.",
     loseText: "Dive the wrong way, too late, or not at all.",
     minTime: 2.8,

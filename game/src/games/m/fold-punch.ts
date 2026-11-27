@@ -1,5 +1,6 @@
 // 199 · UNFOLD IT! — uma folha é dobrada ao meio (duas vezes nos níveis altos) e furada.
-// Escolha, entre três, como a folha fica quando desdobrada (os furos se espelham na dobra).
+// Escolha, entre três, como a folha fica quando desdobrada (os furos se espelham na dobra). Depois da escolha (ou do
+// tempo acabar), a folha furada se desdobra na tela, dobra por dobra, para mostrar como ela fica aberta.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -19,6 +20,35 @@ interface S {
   answer: number;
   choices: Choices;
   t: number;
+  /** Segundos desde o resultado (anima o desdobrar). */
+  endT: number;
+}
+
+/** Atraso e duração de cada dobra desfeita na animação do resultado. */
+const UNFOLD_DELAY = 0.12;
+const UNFOLD_STEP = 0.42;
+/** Tempo na tela depois do resultado: desdobra tudo e ainda dá para comparar com as opções. */
+const AFTER = 1.9;
+
+interface UnfoldStage {
+  axis: "x" | "y";
+  baseCs: number[];
+  baseRs: number[];
+  flapCs: number[];
+  flapRs: number[];
+}
+
+/** Dobras a desfazer, da última para a primeira. */
+function unfoldStages(fold: Fold): UnfoldStage[] {
+  const all = [0, 1, 2, 3];
+  const hi = [2, 3];
+  const lo = [0, 1];
+  if (fold === "v") return [{ axis: "x", baseCs: hi, baseRs: all, flapCs: lo, flapRs: all }];
+  if (fold === "h") return [{ axis: "y", baseCs: all, baseRs: hi, flapCs: all, flapRs: lo }];
+  return [
+    { axis: "y", baseCs: hi, baseRs: hi, flapCs: hi, flapRs: lo },
+    { axis: "x", baseCs: hi, baseRs: all, flapCs: lo, flapRs: all },
+  ];
 }
 
 const key = (cells: Cell[]): string =>
@@ -109,7 +139,9 @@ function setup(api: MicroAPI): MicroInstance {
       gap: portrait ? 22 : 34,
     }),
     t: 0,
+    endT: 0,
   };
+  const opened = unfold(fold, punched);
 
   /** Folha inteira (ou parte dela) com grade fraca e furos. */
   const sheet = (g: Gfx, x: number, y: number, cell: number, cs: number[], rs: number[], hs: Cell[], fill: string = C.white) => {
@@ -133,7 +165,10 @@ function setup(api: MicroAPI): MicroInstance {
     s,
     update(dt) {
       s.t += dt;
-      if (api.result) return;
+      if (api.result) {
+        s.endT += dt;
+        return;
+      }
       const i = s.choices.update();
       if (i === null) return;
       const c = s.choices.center(i);
@@ -177,6 +212,43 @@ function setup(api: MicroAPI): MicroInstance {
           if (s.fold === "h") rs = half;
         }
         if (k >= 2) rs = half;
+        if (last && api.result) {
+          // resultado: a folha furada se desdobra, dobra por dobra (a aba gira em torno da linha da dobra)
+          const stages = unfoldStages(s.fold);
+          let cur = -1;
+          let p = 1;
+          for (let i = 0; i < stages.length; i++) {
+            const q = Math.max(0, Math.min(1, (s.endT - UNFOLD_DELAY - i * UNFOLD_STEP) / UNFOLD_STEP));
+            if (q < 1) {
+              cur = i;
+              p = q * q * (3 - 2 * q);
+              break;
+            }
+          }
+          if (cur < 0) sheet(g, x, y0, cell, all, all, opened, C.white);
+          else {
+            const st = stages[cur];
+            sheet(g, x, y0, cell, st.baseCs, st.baseRs, opened, C.yellow2);
+            const f = -Math.cos(Math.PI * p);
+            if (Math.abs(f) > 0.02) {
+              const fx = x + 2 * cell;
+              const fy = y0 + 2 * cell;
+              g.push();
+              if (st.axis === "x") {
+                g.translate(fx, 0);
+                g.scale(f, 1);
+                g.translate(-fx, 0);
+              } else {
+                g.translate(0, fy);
+                g.scale(1, f);
+                g.translate(0, -fy);
+              }
+              sheet(g, x, y0, cell, st.flapCs, st.flapRs, opened, f < 0 ? C.yellow2 : C.white);
+              g.pop();
+            }
+          }
+          continue;
+        }
         sheet(g, x, y0, cell, cs, rs, last ? s.punched : [], k === 0 ? C.white : C.yellow2);
         // linha da próxima dobra + seta
         if (!last) {
@@ -205,13 +277,20 @@ function setup(api: MicroAPI): MicroInstance {
         } else {
           // furador
           const px = x + sheetW + 40;
-          if (px + 60 < w) {
+          if (px + 60 < w && !api.result) {
             const py = y0 + sheetW * 0.2 + Math.abs(Math.sin(s.t * 5)) * 10;
             g.rect(px - 10, py - 40, 70, 60, C.gray2, { r: 10 });
             g.rect(px + 10, py + 20, 30, 26, C.gray, { r: 4 });
           }
         }
       }
+      // a pergunta, entre o passo a passo e as opções (e, no fim, o que fazer com a animação)
+      const choicesTop = h * 0.56;
+      const qy = (y0 + sheetW + 14 + choicesTop) / 2;
+      const qs = Math.min(50, (choicesTop - y0 - sheetW) * 0.42);
+      if (!api.result) g.text(api.t({ en: "WHICH ONE IS IT, UNFOLDED?", pt: "COMO ELA FICA DESDOBRADA?" }), w / 2, qy, { size: qs, color: C.white, stroke: C.ink, lw: 9 });
+      else if (api.result === "win") g.text(api.t({ en: "EXACTLY! IT OPENS LIKE THIS", pt: "ISSO! ELA ABRE ASSIM" }), w / 2, qy, { size: qs, color: C.yellow, stroke: C.ink, lw: 9 });
+      else g.text(api.t({ en: "SEE HOW IT OPENS!", pt: "OLHA COMO ELA ABRE!" }), w / 2, qy, { size: qs, color: C.red, stroke: C.white, lw: 9 });
       s.choices.draw(
         g,
         (i, r) => {
@@ -238,11 +317,12 @@ export const foldPunch: Entry<S> = {
     family: "choice",
     goal: "complete",
     difficulty: 3,
-    mechanic: "A sheet is folded in half and punched. Pick which of three sheets shows the holes once unfolded (mirrored across the fold). Later: two holes, then two folds.",
+    mechanic: "A sheet is folded in half and punched. Pick which of three sheets shows the holes once unfolded (mirrored across the fold). After the pick (or when time runs out) the punched sheet unfolds on screen, fold by fold, so you can see the answer. Later: two holes, then two folds.",
     winText: "Pick the correctly unfolded sheet.",
     loseText: "Pick a wrong sheet or run out of time.",
     timeScale: 1.6,
     minTime: 4.5,
+    aftermath: AFTER,
     bg: BG.peach,
     setup,
   },

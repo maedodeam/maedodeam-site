@@ -22,19 +22,29 @@ interface S {
 }
 
 const HIT_R = 18;
+/** Distância (unidades do palco) em que um clique de mouse pega o estagiário. No toque, pega de qualquer lugar. */
+const GRAB_R = 100;
 
 function setup(api: MicroAPI): MicroInstance {
   const { w, h, rng } = api;
   const lv = Math.min(api.level, 1.5);
   const portrait = h > w;
-  const W = 150 - 37 * lv;
-  const halfW = W / 2;
   // Caminho ondulado: em retrato vai de baixo para cima.
   const L = portrait ? h - 520 : w - 360;
   const k = L > 1100 ? 1.5 : 1;
   const lambda = L / k;
-  const cross = portrait ? w / 2 - 90 - halfW : h / 2 - 150 - halfW;
-  const A = Math.min(cross, (lambda * lambda) / (4 * Math.PI * Math.PI * (halfW + 40))) * rng.range(0.85, 1);
+  // Amplitude máxima: a curva não pode ser mais fechada que o canal (raio >= meia largura + folga)
+  // nem sair do palco.
+  const maxA = (hw: number) =>
+    Math.min(portrait ? w / 2 - 90 - hw : h / 2 - 150 - hw, (lambda * lambda) / (4 * Math.PI * Math.PI * (hw + 30)));
+  // Largura do canal. Antes: 150 - 37·lv para todos (folga de 57 → 29 unidades para cada lado).
+  // No celular o dedo cobre o estagiário e é impreciso: o canal fica bem mais largo no toque e um pouco mais largo
+  // para todos. Nunca tão largo que dê para ir em linha reta: se a onda não comportar, volta para perto da antiga.
+  const touch = api.input.mode === "touch";
+  const base = (150 - 37 * lv) / 2;
+  let halfW = ((touch ? 230 : 170) - (touch ? 44 : 40) * lv) / 2;
+  while (halfW > base && maxA(halfW) * 0.85 < halfW - HIT_R + 24) halfW -= 2;
+  const A = maxA(halfW) * rng.range(0.85, 1);
   const phase = rng.pick([0, Math.PI]);
   const path: Point[] = [];
   const N = 140;
@@ -102,7 +112,8 @@ function setup(api: MicroAPI): MicroInstance {
     update(dt) {
       if (api.result) return;
       const inp = api.input;
-      if (inp.pressed && Math.hypot(inp.x - s.rx, inp.y - s.ry) < 100) {
+      // No toque o dedo pode encostar em qualquer lugar (o estagiário segue o arrasto, sem ficar escondido sob o dedo).
+      if (inp.pressed && (inp.mode === "touch" || Math.hypot(inp.x - s.rx, inp.y - s.ry) < GRAB_R)) {
         s.held = true;
         s.grabbed = true;
         s.offX = s.rx - inp.x;
@@ -185,7 +196,7 @@ export const buzzWire: Entry<S> = {
     family: "drag",
     goal: "complete",
     difficulty: 2,
-    mechanic: "Grab the little intern at the start and drag them along a wavy electrified channel to the socket, without touching the edges. The arrow keys also move them. The channel narrows with difficulty.",
+    mechanic: "Grab the little intern at the start and drag them along a wavy electrified channel to the socket, without touching the edges. On touch you can press anywhere and drag (the intern follows your finger's movement, so it doesn't hide them), and the channel is wider than with a mouse. The arrow keys also move them. The channel narrows with difficulty.",
     winText: "Reach the goal without touching the edges.",
     loseText: "Touching an edge (zap), or time runs out.",
     timeScale: 1.6,

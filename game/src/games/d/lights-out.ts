@@ -1,4 +1,4 @@
-// 070 · LIGHTS OUT! — último a sair apaga a luz. Tocar numa lâmpada inverte ela e as vizinhas. Apague todas.
+// 070 · LIGHTS OUT! — último a sair apaga a luz. Toque em cada lâmpada acesa para apagá-la. Apague todas.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
 import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
@@ -19,35 +19,13 @@ interface S {
   cordTop: number;
   bill: number;
   dark: number;
-  solution: number[];
 }
 
-function neighborsOf(s: { rows: number; cols: number }, i: number): number[] {
-  const r = Math.floor(i / s.cols);
-  const c = i % s.cols;
-  const out = [i];
-  if (c > 0) out.push(i - 1);
-  if (c < s.cols - 1) out.push(i + 1);
-  if (r > 0) out.push(i - s.cols);
-  if (r < s.rows - 1) out.push(i + s.cols);
+/** Lâmpadas que ainda estão acesas (índices): é exatamente o que falta tocar. */
+export function litBulbs(s: S): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < s.bulbs.length; i++) if (s.bulbs[i].on) out.push(i);
   return out;
-}
-
-/** Menor conjunto de toques que apaga tudo (busca exaustiva: no máximo 2^9). */
-export function solve(s: S): number[] {
-  const n = s.bulbs.length;
-  let best: number[] | null = null;
-  for (let m = 0; m < 1 << n; m++) {
-    const on = s.bulbs.map((b) => b.on);
-    const taps: number[] = [];
-    for (let i = 0; i < n; i++) {
-      if (!(m & (1 << i))) continue;
-      taps.push(i);
-      for (const j of neighborsOf(s, i)) on[j] = !on[j];
-    }
-    if (on.every((v) => !v) && (!best || taps.length < best.length)) best = taps;
-  }
-  return best ?? [];
 }
 
 function setup(api: MicroAPI): MicroInstance {
@@ -57,8 +35,9 @@ function setup(api: MicroAPI): MicroInstance {
   const grid = lv >= 0.9;
   const rows = grid ? 3 : 1;
   const cols = grid ? 3 : lv < 0.4 ? 4 : 5;
-  const presses = lv < 0.4 ? 1 : lv < 1.25 ? 2 : 3;
   const n = rows * cols;
+  // Quantas começam acesas: sempre sobra ao menos uma apagada (tocar nela não faz nada).
+  const lit = lv < 0.4 ? 3 : lv < 0.9 ? 4 : lv < 1.25 ? 6 : 7;
   const sp = grid ? Math.min(portrait ? 290 : 280, (h - 260) / 3.1, (w - 160) / 3) : Math.min((w - 140) / cols, portrait ? 220 : 320);
   const r = grid ? sp * 0.34 : Math.min(sp * 0.36, 115);
   const top = grid ? (h - sp * (rows - 1)) / 2 + (portrait ? 40 : 60) : portrait ? h * 0.45 : h * 0.5;
@@ -68,13 +47,8 @@ function setup(api: MicroAPI): MicroInstance {
     const rr = Math.floor(i / cols);
     bulbs.push({ x: w / 2 + (c - (cols - 1) / 2) * sp, y: top + rr * sp, on: false, swing: 0 });
   }
-  const s: S = { bulbs, rows, cols, r, cordTop: grid ? top - sp * 0.6 : 0, bill: 0, dark: 0, solution: [] };
-  for (let tries = 0; tries < 30; tries++) {
-    for (const b of s.bulbs) b.on = false;
-    for (const i of rng.sample(n, presses)) for (const j of neighborsOf(s, i)) s.bulbs[j].on = !s.bulbs[j].on;
-    if (s.bulbs.some((b) => b.on)) break;
-  }
-  s.solution = solve(s);
+  for (const i of rng.sample(n, lit)) bulbs[i].on = true;
+  const s: S = { bulbs, rows, cols, r, cordTop: grid ? top - sp * 0.6 : 0, bill: 0, dark: 0 };
 
   return {
     s,
@@ -96,10 +70,11 @@ function setup(api: MicroAPI): MicroInstance {
         }
       }
       if (hit < 0) return;
-      for (const j of neighborsOf(s, hit)) {
-        s.bulbs[j].on = !s.bulbs[j].on;
-        s.bulbs[j].swing += j === hit ? 0.35 : 0.15 * Math.sign(j - hit || 1);
-      }
+      const b = s.bulbs[hit];
+      // Só apaga: tocar numa lâmpada já apagada só a balança, sem castigo.
+      b.swing += b.on ? 0.35 : 0.15;
+      if (!b.on) return;
+      b.on = false;
       api.sfx("click");
       if (s.bulbs.every((b) => !b.on)) {
         api.sfx("chime");
@@ -110,12 +85,6 @@ function setup(api: MicroAPI): MicroInstance {
     draw(g: Gfx) {
       const lit = s.bulbs.filter((b) => b.on).length / s.bulbs.length;
       g.clear(mix(BG.night, BG.yellow, lit > 0 ? 0.65 + lit * 0.35 : 0));
-      // fios ligando vizinhas
-      for (let i = 0; i < s.bulbs.length; i++) {
-        const a = s.bulbs[i];
-        if (i % s.cols < s.cols - 1) g.dashed(a.x + s.r, a.y, s.bulbs[i + 1].x - s.r, a.y, lit > 0 ? C.ink2 : C.gray, 6, 14);
-        if (i + s.cols < s.bulbs.length) g.dashed(a.x, a.y + s.r, a.x, s.bulbs[i + s.cols].y - s.r * 1.2, lit > 0 ? C.ink2 : C.gray, 6, 14);
-      }
       // janela com a lua (aparece no escuro)
       const wx = portrait ? w * 0.5 : w * 0.12;
       const wy = portrait ? h * 0.12 : h * 0.2;
@@ -175,7 +144,7 @@ export const lightsOut: Entry<S> = {
     goal: "complete",
     difficulty: 2,
     mechanic:
-      "The last one out turns off the lights. Tapping a bulb flips it and its neighbors (a row of four or five bulbs, or a 3×3 ceiling grid at high levels). Turn every bulb off.",
+      "The last one out turns off the lights. Tap each lit bulb to switch it off; tapping a dark one does nothing. Three of four bulbs start lit, then four of five, then six or seven in a 3×3 ceiling grid at high levels.",
     winText: "All bulbs off.",
     loseText: "Time runs out with lights on.",
     timeScale: 1.4,
@@ -187,24 +156,23 @@ export const lightsOut: Entry<S> = {
     ? {
         win(s, api, io, dt) {
           if (api.result || api.time < 0.05) return;
-          const m = mem<{ cd: number; plan: number[] | null }>(s, () => ({ cd: 0, plan: null }));
+          const m = mem<{ cd: number }>(s, () => ({ cd: 0 }));
           m.cd -= dt;
           if (m.cd > 0 || io.isDown) return;
-          if (!m.plan || !m.plan.length) m.plan = solve(s);
-          const i = m.plan.shift();
+          const i = litBulbs(s)[0];
           if (i === undefined) return;
           io.tap(s.bulbs[i].x, s.bulbs[i].y);
           m.cd = 0.15;
         },
         lose(s, api, io, dt) {
           if (api.result || api.time < 0.05) return;
-          // Toca sempre na mesma lâmpada (liga e desliga as mesmas).
+          // Toca sempre numa lâmpada apagada (não faz nada).
           const m = mem<{ cd: number }>(s, () => ({ cd: 0 }));
           m.cd -= dt;
           if (m.cd > 0 || io.isDown) return;
-          const sol = solve(s);
-          const i = s.bulbs.findIndex((_, k) => !sol.includes(k));
-          io.tap(s.bulbs[Math.max(0, i)].x, s.bulbs[Math.max(0, i)].y);
+          const i = s.bulbs.findIndex((b) => !b.on);
+          if (i < 0) return;
+          io.tap(s.bulbs[i].x, s.bulbs[i].y);
           m.cd = 0.4;
         },
       }

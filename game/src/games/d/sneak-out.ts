@@ -59,13 +59,15 @@ function setup(api: MicroAPI): MicroInstance {
   const lv = Math.min(api.level, 1.5);
   const portrait = h > w;
   const D = api.duration;
-  const warn = 0.3 - lv * 0.08;
+  // Do sinal (cabeça mexendo) até virar: tempo de reação humano mesmo no nível mais alto (0,85 s → 0,55 s).
+  const warn = 0.85 - lv * 0.2;
   const look = 0.7 - lv * 0.15;
   const grace = 0.08;
   const walkTime = clamp(D * 0.4, 1.2, 2.4);
   const nTurns = clamp(Math.floor((D - walkTime - 0.35) / (warn + look + 0.15)), 1, 3);
   const turns: number[] = [];
-  let t = rng.range(0.25, Math.max(0.3, walkTime - warn - grace - 0.25));
+  // A primeira virada vem antes de dar para chegar à porta andando sem parar.
+  let t = rng.range(0.35, Math.max(0.4, walkTime - warn - grace - 0.15));
   for (let i = 0; i < nTurns; i++) {
     turns.push(t);
     t += warn + look + rng.range(0.25, 0.7);
@@ -172,7 +174,8 @@ function setup(api: MicroAPI): MicroInstance {
         boss(g, 0, 0, bs, { mood: s.caught ? "angry" : "neutral", look: { x: (s.x - bx) / 600, y: 0.3 } });
         g.pop();
       } else {
-        const twitch = s.phase === "warn" ? Math.sin(s.t * 60) * 0.2 : 0;
+        // o tremor da cabeça aumenta até ele virar
+        const twitch = s.phase === "warn" ? Math.sin(s.t * 45) * (0.12 + 0.16 * clamp(s.since / s.warn, 0, 1)) : 0;
         bossBack(g, bx, by + 40 * bs, bs, twitch);
         if (s.phase === "warn") g.text("?", bx + 70 * bs, by - 300 * bs, { size: 110, color: C.red, stroke: C.ink, lw: 12 });
       }

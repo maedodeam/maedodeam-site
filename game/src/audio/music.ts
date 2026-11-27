@@ -9,6 +9,18 @@ import { boom, playCrash, playEvent, playSnare, playTom, riser, tapeStop, type B
 import { reverbIR } from "./voice.ts";
 
 const LOOKAHEAD = 0.12;
+/** A fala dura até ~1,3 s; a cauda do reverb não segura o ducking. */
+const SPEECH_MAX = 1.4;
+
+/** Ducking: desce `db` em 40 ms a partir de `from`, segura até `until` e volta em 200 ms. */
+export function duckFor(p: AudioParam, from: number, until: number, db: number): void {
+  const low = Math.pow(10, -db / 20);
+  p.cancelScheduledValues(from);
+  p.setValueAtTime(1, from);
+  p.linearRampToValueAtTime(low, from + 0.04);
+  p.setValueAtTime(low, Math.max(from + 0.04, until));
+  p.linearRampToValueAtTime(1, Math.max(from + 0.04, until) + 0.2);
+}
 const TICK_MS = 25;
 
 /** Próximo instante da grade (a cada `every` passos) a partir de `after`. Puro: usado também nos testes. */
@@ -37,6 +49,10 @@ export class MusicEngine {
   private readonly duck: GainNode;
   private readonly cutFilter: BiquadFilterNode;
   readonly voiceOut: GainNode;
+  /** Trilha e efeitos, antes da saída: abaixa durante a fala do SPEED UP (ducking). A voz não passa por aqui. */
+  private readonly musicOut: GainNode;
+  /** Quanto a trilha abaixa durante a fala (dB). */
+  voiceDuckDb = 4;
   private timer: ReturnType<typeof setInterval> | null = null;
   /** Instrumentos silenciados (só para medições no laboratório). */
   filterOut: Set<string> | null = null;
@@ -74,7 +90,8 @@ export class MusicEngine {
     this.cutFilter = ctx.createBiquadFilter();
     this.cutFilter.type = "lowpass";
     this.cutFilter.frequency.value = 20000;
-    input.connect(pump).connect(this.duck).connect(this.cutFilter).connect(out);
+    this.musicOut = ctx.createGain();
+    input.connect(pump).connect(this.duck).connect(this.cutFilter).connect(this.musicOut).connect(out);
     const reverb = ctx.createConvolver();
     reverb.buffer = reverbIR(ctx, 1.8, 3.2);
     const revOut = ctx.createGain();
@@ -326,7 +343,7 @@ export class MusicEngine {
    * Aceleração: corte dramático → locução → virada → volta mais rápida (e mais alta, em outro tom) no downbeat
    * que coincide com o fim da tela de aceleração (`duration` segundos a partir de agora).
    */
-  speedup(tier: number, duration: number): void {
+  speedup(tier: number, duration: number, voice?: AudioBuffer | null): void {
     const now = this.now;
     const newBpm = bpmForTier(tier);
     const cutAt = Math.max(now + 0.005, Math.min(this.nextStepTime, now + LOOKAHEAD));
@@ -338,13 +355,18 @@ export class MusicEngine {
     tapeStop(b, plan.cut, this.chordNotes(48, 72), 0.4);
     boom(b, plan.cut, 1);
     // 2) a voz
-    const id = this.announceOrder.length ? this.announceOrder[this.announceIdx++ % this.announceOrder.length] : null;
-    const buf = id ? this.announcements.get(id) : null;
+    // `voice` informado (falas gravadas sorteadas por fase, ou null = sem voz); senão, a rotação dos anúncios
+    let buf = voice;
+    if (buf === undefined) {
+      const id = this.announceOrder.length ? this.announceOrder[this.announceIdx++ % this.announceOrder.length] : null;
+      buf = id ? this.announcements.get(id) : null;
+    }
     if (buf) {
       const s = this.ctx.createBufferSource();
       s.buffer = buf;
       s.connect(this.voiceOut);
       s.start(plan.voice);
+      if (this.voiceDuckDb > 0) duckFor(this.musicOut.gain, plan.cut, plan.voice + Math.min(buf.duration, SPEECH_MAX), this.voiceDuckDb);
     }
     // 3) virada no novo andamento: caixa em semicolcheias crescendo + tons + subida de ruído
     const sd = stepSeconds(newBpm);

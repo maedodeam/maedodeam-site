@@ -29,7 +29,7 @@ export type Category =
 export type Family = "tap" | "action" | "drag" | "hold" | "swipe" | "move" | "choice";
 
 /** Dica de controle mostrada sob o verbo. O texto final depende do aparelho (ver i18n.ts). */
-export type PointerHint = "tap" | "tap-many" | "drag" | "hold" | "swipe" | "move" | "none";
+export type PointerHint = "tap" | "tap-many" | "drag" | "hold" | "swipe" | "move" | "goto" | "none";
 /** Teclas aceitas. Ausente = o microgame não tem versão de teclado (no desktop, usa-se o mouse). */
 export type KeyHint = "space" | "lr" | "ud" | "arrows" | "arrows-space" | "digits" | "type" | "none";
 
@@ -59,6 +59,11 @@ export interface MicrogameDef {
   timeScale?: number;
   /** Duração mínima em segundos, mesmo nas velocidades altas. Padrão 2.6. */
   minTime?: number;
+  /**
+   * Segundos em que o microgame continua na tela depois do resultado (sem entrada). Padrão: AFTERMATH (0,6 s). Só
+   * para quem precisa mostrar a resposta com uma animação (ex.: a folha se desdobrando).
+   */
+  aftermath?: number;
   /**
    * WTF Moment: desafio absurdo que quebra a expectativa (mas tem lógica e dá para vencer).
    * O sequenciador os sorteia à parte: o primeiro entre a 8ª e a 12ª fase, depois um a cada ~8–12.

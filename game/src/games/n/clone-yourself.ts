@@ -1,5 +1,6 @@
 // 203 · CLONE YOURSELF! — WTF: laboratório psicodélico de clonagem. O pedido é "EXATAMENTE N DE VOCÊ" (3 a 7).
-// A alavanca DOBRA todos os clones; tocar num clone estoura ele (−1). Aperte DESPACHA quando a conta bater.
+// A alavanca DOBRA todos os clones; o botão "−1 ESTOURA 1" (ou tocar direto num clone) estoura um (−1). Aperte
+// DESPACHA quando a conta bater.
 // Mais de 16 = o tanque transborda (perde); despachar com a conta errada também perde.
 // Níveis altos: alvos maiores, clones mais rápidos e (lv ≥ 1) já começam 2 ou 3 de você no tanque.
 import type { Entry, MicroAPI, MicroInstance } from "../../core/types.ts";
@@ -7,7 +8,7 @@ import type { Gfx } from "../../gfx/draw.ts";
 import { C, BG } from "../../gfx/palette.ts";
 import { psyBackdrop, psyColor, psyWash, wobbleText } from "../../gfx/wtf.ts";
 import { mem } from "../../testing/botkit.ts";
-import { clamp, isPortrait } from "./util.ts";
+import { clamp, fitText, isPortrait } from "./util.ts";
 
 const MAX = 16;
 
@@ -35,6 +36,9 @@ interface S {
   tank: { x: number; y: number; w: number; h: number };
   lever: { x: number; y: number };
   ship: { x: number; y: number };
+  /** Botão "−1": estoura um clone (o mais novo). */
+  pop: { x: number; y: number };
+  popPress: number;
   speed: number;
   pull: number;
   press: number;
@@ -44,6 +48,9 @@ interface S {
   endT: number;
 }
 
+/** Raio do botão "−1". */
+const POP_R = 78;
+
 function setup(api: MicroAPI): MicroInstance {
   const { w, h, rng } = api;
   const lv = Math.min(api.level, 1.5);
@@ -52,18 +59,23 @@ function setup(api: MicroAPI): MicroInstance {
   let tank: S["tank"];
   let lever: S["lever"];
   let ship: S["ship"];
+  let pop: S["pop"];
   if (portrait) {
     tank = { x: 70, y: h * 0.17, w: w - 140, h: h * 0.5 };
-    lever = { x: w * 0.27, y: h * 0.83 };
-    ship = { x: w * 0.72, y: h * 0.83 };
+    lever = { x: w * 0.2, y: h * 0.83 };
+    pop = { x: w * 0.5, y: h * 0.84 };
+    ship = { x: w * 0.8, y: h * 0.83 };
   } else if (wide) {
     tank = { x: w * 0.06, y: h * 0.2, w: w * 0.62, h: h * 0.72 };
-    lever = { x: w * 0.84, y: h * 0.4 };
+    lever = { x: w * 0.77, y: h * 0.4 };
+    pop = { x: w * 0.91, y: h * 0.43 };
     ship = { x: w * 0.84, y: h * 0.76 };
   } else {
     tank = { x: 50, y: h * 0.2, w: w * 0.6, h: h * 0.72 };
-    lever = { x: w * 0.82, y: h * 0.42 };
-    ship = { x: w * 0.82, y: h * 0.77 };
+    // tela quase quadrada: as três peças em coluna, à direita do tanque
+    lever = { x: w * 0.82, y: h * 0.28 };
+    pop = { x: w * 0.82, y: h * 0.57 };
+    ship = { x: w * 0.82, y: h * 0.82 };
   }
   const start = lv >= 1 ? rng.int(2, 3) : 1;
   let target = lv < 0.5 ? rng.int(3, 5) : rng.int(3, 7);
@@ -75,6 +87,8 @@ function setup(api: MicroAPI): MicroInstance {
     tank,
     lever,
     ship,
+    pop,
+    popPress: 0,
     speed,
     pull: 0,
     press: 0,
@@ -104,6 +118,7 @@ function setup(api: MicroAPI): MicroInstance {
       s.t += dt;
       s.pull = Math.max(0, s.pull - dt * 3);
       s.press = Math.max(0, s.press - dt * 3);
+      s.popPress = Math.max(0, s.popPress - dt * 4);
       for (const p of s.puffs) p.t += dt;
       s.puffs = s.puffs.filter((p) => p.t < 0.5);
       const m = 52 * cloneScale(s.clones.length) + 6;
@@ -142,7 +157,20 @@ function setup(api: MicroAPI): MicroInstance {
         }
         return;
       }
-      if (Math.hypot(x - s.lever.x, y - s.lever.y) < 120) {
+      const dLever = Math.hypot(x - s.lever.x, y - s.lever.y);
+      const dPop = Math.hypot(x - s.pop.x, y - s.pop.y);
+      if (dPop < POP_R + 20 && dPop <= dLever) {
+        // botão −1: estoura o clone mais novo
+        s.popPress = 1;
+        const c = s.clones.pop();
+        if (c) {
+          s.puffs.push({ x: c.x, y: c.y, t: 0 });
+          api.sfx("boing");
+          api.fx.burst(c.x, c.y, psyColor(s.t, s.clones.length * 40), 10);
+        } else api.sfx("tap");
+        return;
+      }
+      if (dLever < 120) {
         s.pull = 1;
         api.sfx("warp");
         for (const c of s.clones.slice()) add(c.x + rng.range(-60, 60), c.y + rng.range(-60, 60));
@@ -238,7 +266,7 @@ function setup(api: MicroAPI): MicroInstance {
       g.text(lab, tk.x + 170, sy, { size: 56, color: C.ink });
       g.rect(tk.x + tk.w - 300, sy - 44, 280, 88, C.yellow, { r: 20 });
       g.text(goal, tk.x + tk.w - 160, sy, { size: 56, color: C.ink });
-      g.text(`MAX ${MAX}`, tk.x + tk.w / 2, tk.y + tk.h - 30, { size: 34, font: "mono", color: C.ink2 });
+      fitText(g, api.t({ en: `MAX ${MAX} · TAP A CLONE TO POP IT`, pt: `MÁX ${MAX} · TOQUE NUM CLONE PARA ESTOURAR` }), tk.x + tk.w / 2, tk.y + tk.h - 30, tk.w - 120, { size: 32, font: "mono", color: C.ink2 });
       // alavanca ×2
       const L = s.lever;
       g.rect(L.x - 80, L.y + 20, 160, 70, C.gray2, { r: 16 });
@@ -249,6 +277,14 @@ function setup(api: MicroAPI): MicroInstance {
       g.line(L.x, L.y + 40, kx, ky, C.paper2, 12);
       g.circle(kx, ky, 40, C.red);
       wobbleText(g, "×2", L.x, L.y + 140, t, { size: 70, stroke: C.ink, lw: 10 }, 10);
+      // botão −1 (estoura um clone)
+      const P = s.pop;
+      const pd = s.popPress * 10;
+      g.circle(P.x, P.y + 14, POP_R, C.ink, { stroke: null });
+      g.circle(P.x, P.y + pd, POP_R, C.pink, { lw: 7 });
+      g.star(P.x, P.y + pd, POP_R * 0.78, POP_R * 0.5, 8, C.yellow, { lw: 4 });
+      g.text("−1", P.x, P.y + pd, { size: 64, color: C.white, stroke: C.ink, lw: 10 });
+      g.text(api.t({ en: "POP ONE", pt: "ESTOURA 1" }), P.x, P.y + POP_R + 44, { size: 38, color: C.white, stroke: C.ink, lw: 8 });
       // botão despachar
       const B = s.ship;
       g.ellipse(B.x, B.y + 26, 112, 50, C.gray2);
@@ -300,7 +336,7 @@ export const cloneYourself: Entry<S> = {
     goal: "complete",
     difficulty: 2,
     mechanic:
-      "WTF Moment: a psychedelic cloning lab asks for EXACTLY N of you (3 to 7). The lever doubles every clone, tapping a clone pops it, and SHIP IT checks the count. More than 16 clones overflows the tank.",
+      "WTF Moment: a psychedelic cloning lab asks for EXACTLY N of you (3 to 7). The lever doubles every clone, the −1 button (or tapping a clone directly) pops one, and SHIP IT checks the count. More than 16 clones overflows the tank.",
     winText: "Press SHIP IT with exactly the asked number of clones.",
     loseText: "Ship the wrong count, overflow the tank past 16, or run out of time.",
     timeScale: 1.3,
@@ -323,7 +359,9 @@ export const cloneYourself: Entry<S> = {
           }
           const op = plan(n, s.target)[0];
           if (op === "D") io.tap(s.lever.x, s.lever.y);
+          else if (n % 2) io.tap(s.pop.x, s.pop.y);
           else {
+            // às vezes estoura tocando direto no clone (os dois jeitos valem)
             const c = s.clones[0];
             io.tap(c.x + c.vx / 60, c.y + c.vy / 60);
           }

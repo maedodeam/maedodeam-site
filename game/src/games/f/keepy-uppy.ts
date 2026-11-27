@@ -161,11 +161,9 @@ function setup(api: MicroAPI): MicroInstance {
       // o jogador (com o pé levantado logo depois do chute)
       const kicking = s.kickT < 0.25;
       const mood = s.dropped ? "sad" : kicking ? "happy" : "worried";
-      person(g, s.footX, s.floorY, 1.3, { shirt: C.white, tie: C.orange, mood, look: { x: clamp((s.x - s.footX) / 300, -1, 1), y: -1 } });
-      if (kicking) {
-        g.line(s.footX + 18, s.floorY - 78, s.footX + 90, s.floorY - 150, C.ink, 21);
-        g.ellipse(s.footX + 100, s.floorY - 160, 30, 18, C.ink2, { rot: -0.8 });
-      }
+      // chuta com a perna do lado da bolinha (uma das duas pernas sobe; nunca uma terceira)
+      const kick = kicking ? (s.x < s.footX - 10 ? -1 : 1) : undefined;
+      person(g, s.footX, s.floorY, 1.3, { shirt: C.white, tie: C.orange, mood, kick, look: { x: clamp((s.x - s.footX) / 300, -1, 1), y: -1 } });
       // sombra e bolinha
       const k = clamp(1 - (s.floorY - s.y) / h, 0.2, 1);
       g.shadow(s.x, s.floorY + 6, 40 * k + 10);
