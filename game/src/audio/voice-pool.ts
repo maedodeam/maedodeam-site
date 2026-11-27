@@ -7,7 +7,7 @@ export interface VoiceClip {
   id: string;
   /** Primeira fase (microgames jogados) em que a fala pode tocar. */
   from: number;
-  /** Gravação crua: o jogo aplica o tratamento natural (cleanVoice: compressão leve e sala curta). */
+  /** Gravação crua: o jogo aplica o tratamento natural (speedupVoice: compressão moderada e reverb curto). */
   raw: boolean;
   /** Arquivo em base64. */
   data: string;
