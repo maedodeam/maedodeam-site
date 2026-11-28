@@ -3,6 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ENTRIES, CATALOG } from "../src/games/index.ts";
+import { titleVerbs } from "../src/core/i18n.ts";
 import type { Category, Family } from "../src/core/types.ts";
 
 const CATEGORIES: Category[] = ["reflex", "precision", "perception", "logic", "timing", "memory", "dodge", "drag", "balance", "puzzle", "office", "tech", "absurd"];
@@ -55,4 +56,15 @@ test("nomes e verbos únicos por idioma (não são variações de texto do mesmo
 test("catálogo ordenado por número e todos jogáveis com ponteiro (mouse e toque)", () => {
   for (let i = 1; i < CATALOG.length; i++) assert.ok(CATALOG[i].num > CATALOG[i - 1].num);
   for (const d of CATALOG) assert.ok(d.hint.pointer, `${d.id} sem controle de ponteiro`);
+});
+
+test("fundo da tela inicial: nenhuma instrução aparece com marcador por preencher (ex.: \"STOP AT {N}!\")", () => {
+  for (const lang of ["en", "pt"] as const) {
+    const verbs = titleVerbs(CATALOG, lang);
+    assert.equal(verbs.length, CATALOG.length);
+    const raw = verbs.filter((v) => /[{}]/.test(v));
+    assert.deepEqual(raw, [], `${lang}: ${raw.join(", ")}`);
+  }
+  assert.ok(titleVerbs(CATALOG, "en").includes("STOP AT 7!"));
+  assert.ok(titleVerbs(CATALOG, "pt").includes("PARA NO 7!"));
 });

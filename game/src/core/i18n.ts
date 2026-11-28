@@ -38,6 +38,14 @@ export function tr(text: Text, lang: Lang): string {
   return text[lang] ?? text.en;
 }
 
+/**
+ * Instruções do catálogo para o fundo animado da tela inicial. As que são sorteadas a cada rodada trazem um marcador
+ * no catálogo ("STOP AT {N}!"); no fundo entra um número de exemplo no lugar dele.
+ */
+export function titleVerbs(defs: readonly { verb: Text }[], lang: Lang): string[] {
+  return defs.map((d) => tr(d.verb, lang).replace(/\{N\}/g, "7"));
+}
+
 const POINTER: Record<PointerHint, { mouse: Text; touch: Text }> = {
   tap: { mouse: { en: "CLICK", pt: "CLIQUE" }, touch: { en: "TAP", pt: "TOQUE" } },
   "tap-many": { mouse: { en: "CLICK FAST", pt: "CLIQUE RÁPIDO" }, touch: { en: "TAP FAST", pt: "TOQUE RÁPIDO" } },

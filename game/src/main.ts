@@ -2,7 +2,7 @@
 // Liga canvas, entrada, sessão, áudio e as telas do DOM. Nada é salvo: sem cookies, sem storage, sem rede.
 import { AudioManager } from "./audio/audio.ts";
 import { DomInput } from "./core/dom-input.ts";
-import { tr, UI } from "./core/i18n.ts";
+import { titleVerbs, tr, UI } from "./core/i18n.ts";
 import { fitStage, hudBands, type Fit } from "./core/layout.ts";
 import { LIFE_POP_AT, Session, SPEEDUP_TIME } from "./core/session.ts";
 import type { Lang } from "./core/types.ts";
@@ -112,7 +112,8 @@ const session = new Session({
         break;
       case "game":
         if (e.def.wtf) audio.wtfStart(e.def.wtf === "insane");
-        if (live) live.textContent = `${tr(e.def.verb, lang)} — ${tr(e.def.name, lang)}`;
+        // a instrução sorteada na rodada (ex.: "STOP AT 4!"), não a do catálogo com o marcador
+        if (live) live.textContent = `${tr(session.runner?.verb ?? e.def.verb, lang)} — ${tr(e.def.name, lang)}`;
         break;
       case "result":
         skills.record(e.def, e.result);
@@ -302,7 +303,7 @@ window.addEventListener("keydown", (e) => {
 
 let last = performance.now();
 let clock = 0;
-const verbs = CATALOG.map((d) => tr(d.verb, lang));
+const verbs = titleVerbs(CATALOG, lang);
 
 function frame(now: number): void {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
